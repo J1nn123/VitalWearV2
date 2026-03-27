@@ -579,7 +579,7 @@ $rescuersJson = json_encode(array_values($rescuers));
 // ══════════════════════════════════════════════════════
 // CHART.JS SETUP
 // ══════════════════════════════════════════════════════
-Chart.defaults.color      = '#64748b';
+Chart.defaults.color       = '#64748b';
 Chart.defaults.borderColor = 'rgba(255,255,255,0.04)';
 Chart.defaults.font.family = "'DM Sans', sans-serif";
 
@@ -704,6 +704,9 @@ async function fetchLiveData() {
         const data = await res.json();
         if (!data.success) return;
 
+        // ── Notify sidebar sim picker that patient rows are ready ──
+        window.dispatchEvent(new Event('vitalwear:live-loaded'));
+
         document.getElementById('statTotal').textContent    = data.summary.total;
         document.getElementById('statNormal').textContent   = data.summary.normal;
         document.getElementById('statWarning').textContent  = data.summary.warning;
@@ -767,7 +770,7 @@ async function fetchLiveData() {
             banner.style.display = 'none';
         }
 
-        if (typeof handleAlerts          === 'function') handleAlerts(data.patients);
+        if (typeof handleAlerts           === 'function') handleAlerts(data.patients);
         if (typeof updateCriticalNavBadge === 'function') updateCriticalNavBadge(data.summary.critical);
 
     } catch (err) { console.warn('Live update error:', err); }
@@ -944,7 +947,6 @@ async function submitAlert() {
         } else { showErr(errEl, data.message); }
     } catch(e) { showErr(errEl, 'Network error. Please try again.'); }
 }
-
 
 function showErr(el, msg) { el.textContent = msg; el.style.display = 'block'; }
 

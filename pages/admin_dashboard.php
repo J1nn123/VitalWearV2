@@ -19,7 +19,6 @@ $msg = $msgType = '';
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $action = $_POST['action'] ?? '';
 
-    // ── User Management ────────────────────────────────────────────────────────
     if ($action === 'add_user') {
         $un   = trim($_POST['username']  ?? '');
         $pw   = trim($_POST['password']  ?? '');
@@ -67,7 +66,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $tab = 'users';
     }
 
-    // ── Patient Management ─────────────────────────────────────────────────────
     if ($action === 'add_patient') {
         $nm   = trim($_POST['name']        ?? '');
         $age  = (int)($_POST['age']        ?? 0);
@@ -103,7 +101,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $tab = 'patients';
     }
 
-    // ── Device Management ──────────────────────────────────────────────────────
     if ($action === 'add_device') {
         $label  = trim($_POST['device_label']  ?? '');
         $type   = trim($_POST['device_type']   ?? '');
@@ -165,7 +162,6 @@ if (isset($_GET['delete_user'])) {
     } else { $msg = 'You cannot delete your own account.'; $msgType='error'; }
     $tab = 'users';
 }
-
 if (isset($_GET['delete_patient'])) {
     $id = (int)$_GET['delete_patient'];
     try {
@@ -175,7 +171,6 @@ if (isset($_GET['delete_patient'])) {
     } catch (Exception $e) { $msg = 'Database error: '.$e->getMessage(); $msgType='error'; }
     $tab = 'patients';
 }
-
 if (isset($_GET['delete_device'])) {
     $id = (int)$_GET['delete_device'];
     try {
@@ -192,49 +187,31 @@ $patients = $pdo->query("
     SELECT p.*, u.full_name AS rescuer_name,
            (SELECT heart_rate FROM heart_rate_logs WHERE patient_id=p.id ORDER BY id DESC LIMIT 1) AS heart_rate,
            (SELECT status     FROM heart_rate_logs WHERE patient_id=p.id ORDER BY id DESC LIMIT 1) AS hr_status
-    FROM patients p
-    LEFT JOIN users u ON u.id = p.assigned_to
-    ORDER BY p.name
+    FROM patients p LEFT JOIN users u ON u.id = p.assigned_to ORDER BY p.name
 ")->fetchAll();
 $logs     = $pdo->query("
-    SELECT sl.*, u.full_name, u.role
-    FROM system_logs sl
-    LEFT JOIN users u ON u.id = sl.user_id
-    ORDER BY sl.timestamp DESC LIMIT 100
+    SELECT sl.*, u.full_name, u.role FROM system_logs sl
+    LEFT JOIN users u ON u.id = sl.user_id ORDER BY sl.timestamp DESC LIMIT 100
 ")->fetchAll();
 $rescuers = $pdo->query("SELECT id, full_name FROM users WHERE role='rescuer' ORDER BY full_name")->fetchAll();
 
-// Devices
 $devices = $pdo->query("
     SELECT d.*, p.name AS patient_name, u.full_name AS user_name
-    FROM devices d
-    LEFT JOIN patients p ON p.id = d.assigned_to_patient
-    LEFT JOIN users    u ON u.id = d.assigned_to_user
-    ORDER BY d.serial_status ASC, d.label ASC
+    FROM devices d LEFT JOIN patients p ON p.id = d.assigned_to_patient
+    LEFT JOIN users u ON u.id = d.assigned_to_user ORDER BY d.serial_status ASC, d.label ASC
 ")->fetchAll();
 $deviceStats = ['usable'=>0,'in-use'=>0,'maintenance'=>0,'disposable'=>0];
 foreach ($devices as $d) { if (isset($deviceStats[$d['serial_status']])) $deviceStats[$d['serial_status']]++; }
 
-// ─── Incident Reports (all, grouped by patient_id for admin view) ─────────────
 $incidentReports = $pdo->query("
-    SELECT ir.*,
-           p.name        AS patient_name,
-           p.age         AS patient_age,
-           u.full_name   AS rescuer_name,
-           u.role        AS rescuer_role
-    FROM incident_reports ir
-    JOIN patients p ON p.id = ir.patient_id
-    JOIN users    u ON u.id = ir.rescuer_id
-    ORDER BY ir.created_at DESC
+    SELECT ir.*, p.name AS patient_name, p.age AS patient_age,
+           u.full_name AS rescuer_name, u.role AS rescuer_role
+    FROM incident_reports ir JOIN patients p ON p.id = ir.patient_id
+    JOIN users u ON u.id = ir.rescuer_id ORDER BY ir.created_at DESC
 ")->fetchAll();
-
-// Group reports by patient_id for JS lookup
 $reportsByPatient = [];
-foreach ($incidentReports as $ir) {
-    $reportsByPatient[$ir['patient_id']][] = $ir;
-}
+foreach ($incidentReports as $ir) { $reportsByPatient[$ir['patient_id']][] = $ir; }
 
-// Analytics
 $totalLogs  = $pdo->query("SELECT COUNT(*) FROM heart_rate_logs")->fetchColumn();
 $alertToday = $pdo->query("SELECT COUNT(*) FROM heart_rate_logs WHERE status='critical' AND DATE(timestamp)=CURDATE()")->fetchColumn();
 $normalCnt  = (int)$pdo->query("SELECT COUNT(*) FROM heart_rate_logs WHERE status='normal'")->fetchColumn();
@@ -243,25 +220,19 @@ $critCnt    = (int)$pdo->query("SELECT COUNT(*) FROM heart_rate_logs WHERE statu
 
 $hourlyData = $pdo->query("
     SELECT DATE_FORMAT(timestamp,'%H:00') AS hour_label,
-           ROUND(AVG(heart_rate),1)       AS avg_bpm,
+           ROUND(AVG(heart_rate),1) AS avg_bpm,
            SUM(CASE WHEN status='critical' THEN 1 ELSE 0 END) AS critical_count
-    FROM heart_rate_logs
-    WHERE timestamp >= NOW() - INTERVAL 12 HOUR
-    GROUP BY DATE_FORMAT(timestamp,'%H:00')
-    ORDER BY timestamp ASC
+    FROM heart_rate_logs WHERE timestamp >= NOW() - INTERVAL 12 HOUR
+    GROUP BY DATE_FORMAT(timestamp,'%H:00') ORDER BY timestamp ASC
 ")->fetchAll();
 
 $rescuerPerf = $pdo->query("
-    SELECT u.full_name, u.id,
-           COUNT(DISTINCT p.id) AS patient_count,
+    SELECT u.full_name, u.id, COUNT(DISTINCT p.id) AS patient_count,
            COALESCE((SELECT COUNT(*) FROM incident_reports ir WHERE ir.rescuer_id=u.id),0) AS report_count
-    FROM users u
-    LEFT JOIN patients p ON p.assigned_to=u.id
-    WHERE u.role='rescuer'
-    GROUP BY u.id, u.full_name
+    FROM users u LEFT JOIN patients p ON p.assigned_to=u.id
+    WHERE u.role='rescuer' GROUP BY u.id, u.full_name
 ")->fetchAll();
 
-// Summary counts
 $totalUsers    = count($users);
 $totalPatients = count($patients);
 $activeAlerts  = count(array_filter($patients, fn($p) => ($p['hr_status'] ?? '') === 'critical'));
@@ -271,122 +242,112 @@ $activeAlerts  = count(array_filter($patients, fn($p) => ($p['hr_status'] ?? '')
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Admin Dashboard — HeartCare</title>
-    <link rel="stylesheet" href="../assets/css/styles.css">
+    <title>Admin Dashboard — VitalWear</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
     <style>
-        .device-stats-grid { display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:20px; }
-        .device-mini-card  { background:var(--bg-card,#1e293b);border-radius:10px;padding:16px 18px;text-align:center;border:1px solid var(--border,#334155); }
-        .device-mini-card .dmc-count { font-size:28px;font-weight:800;margin:4px 0 2px; }
-        .device-mini-card .dmc-label { font-size:12px;font-weight:600;color:var(--text-muted,#94a3b8);text-transform:uppercase; }
-        .status-select { padding:4px 8px;border-radius:6px;font-size:12px;font-weight:600;border:1px solid var(--border,#334155);background:var(--bg-input,#0f172a);color:var(--text-primary,#f1f5f9);cursor:pointer; }
-        .action-btn { padding:5px 12px;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;border:none;margin-left:4px; }
-        .action-btn-blue   { background:rgba(59,130,246,.15);color:#3b82f6; }
-        .action-btn-yellow { background:rgba(245,158,11,.15);color:#f59e0b; }
+        /* ── Hide hamburger on desktop ── */
+        @media (min-width: 769px) {
+            .menu-toggle { display: none !important; }
+        }
 
-        /* ── Patient Reports Modal ── */
-        .report-card {
-            background: var(--bg-surface, #0f172a);
-            border: 1px solid var(--border, #334155);
-            border-radius: 10px;
-            padding: 16px 18px;
-            margin-bottom: 12px;
-        }
-        .report-card:last-child { margin-bottom: 0; }
-        .report-card-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: flex-start;
-            margin-bottom: 8px;
-            gap: 10px;
-        }
-        .report-card-title {
-            font-size: 14px;
-            font-weight: 700;
-            color: var(--text-primary, #f1f5f9);
-            flex: 1;
-        }
-        .report-card-meta {
-            font-size: 12px;
-            color: var(--text-muted, #94a3b8);
-            margin-bottom: 6px;
-            display: flex;
-            gap: 14px;
-            flex-wrap: wrap;
-        }
-        .report-card-desc {
-            font-size: 13px;
-            color: var(--text-secondary, #cbd5e1);
-            line-height: 1.6;
-            white-space: pre-wrap;
-        }
-        .report-empty {
+        /* ── Mini info cards (role distribution / device summary on overview) ── */
+        .mini-info-card {
+            background: #fff;
+            border: 1.5px solid rgba(239,108,82,.30);
+            border-radius: 12px;
+            padding: 20px;
             text-align: center;
-            padding: 50px 20px;
-            color: var(--text-muted, #64748b);
-            font-size: 14px;
+            box-shadow: 0 4px 20px rgba(239,108,82,.18), 0 1px 6px rgba(30,36,80,.10);
+            transition: transform .2s, box-shadow .2s;
         }
-        .sev-badge {
-            padding: 2px 10px;
-            border-radius: 20px;
-            font-size: 11px;
-            font-weight: 700;
-            text-transform: uppercase;
-            white-space: nowrap;
+        .mini-info-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 12px 40px rgba(239,108,82,.28), 0 4px 12px rgba(30,36,80,.14);
         }
-        .sev-low      { background: rgba(16,185,129,.15); color:#10b981; border:1px solid rgba(16,185,129,.3); }
-        .sev-medium   { background: rgba(59,130,246,.15);  color:#3b82f6; border:1px solid rgba(59,130,246,.3); }
-        .sev-high     { background: rgba(245,158,11,.15);  color:#f59e0b; border:1px solid rgba(245,158,11,.3); }
-        .sev-critical { background: rgba(239,68,68,.15);   color:#ef4444; border:1px solid rgba(239,68,68,.3); }
-
-        /* Wide modal for reports */
-        #patientReportsModal .modal {
-            max-width: 680px;
-            width: 95vw;
+        .mini-info-card .mic-value {
+            font-size: 28px;
+            font-weight: 800;
+            line-height: 1.1;
+            margin-bottom: 6px;
         }
-        #patientReportsModal .modal-body {
-            max-height: 65vh;
-            overflow-y: auto;
-        }
-        .patient-report-info {
-            display: flex;
-            gap: 12px;
-            align-items: center;
-            padding: 12px 16px;
-            background: var(--bg-surface, #0f172a);
-            border-radius: 8px;
-            margin-bottom: 16px;
-            border: 1px solid var(--border, #334155);
-        }
-        .patient-report-info .pri-name { font-size: 16px; font-weight: 700; }
-        .patient-report-info .pri-sub  { font-size: 12px; color: var(--text-muted, #94a3b8); }
-        .report-count-badge {
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            background: rgba(99,102,241,.15);
-            color: #818cf8;
-            border: 1px solid rgba(99,102,241,.3);
-            border-radius: 20px;
-            font-size: 11px;
-            font-weight: 700;
-            padding: 2px 8px;
-            margin-left: 8px;
+        .mic-red    { color: #ef4444; }
+        .mic-blue   { color: #3b82f6; }
+        .mic-yellow { color: #f59e0b; }
+        .mic-coral  { color: #EF6C52; }
+        .mini-info-card .mic-label {
+            font-size: 12px;
+            font-weight: 600;
+            color: #6B7280;
+            text-transform: capitalize;
         }
 
+        /* ── Device mini-cards ── */
+        .device-stats-grid {
+            display: grid; grid-template-columns: repeat(4,1fr); gap: 16px; margin-bottom: 22px;
+        }
         @media(max-width:700px){ .device-stats-grid{ grid-template-columns:repeat(2,1fr); } }
+
+        /* ── Status select ── */
+        .status-select {
+            background: #F9FAFB !important;
+            border: 1px solid #E5E7EB !important;
+            color: #1E2450 !important;
+            border-radius: 8px !important;
+            padding: 5px 10px !important;
+            font-size: 12px !important;
+            font-weight: 600;
+            cursor: pointer;
+            font-family: 'DM Sans', sans-serif;
+        }
+        .status-select:focus {
+            outline: none;
+            border-color: #EF6C52 !important;
+            box-shadow: 0 0 0 3px rgba(239,108,82,.12) !important;
+        }
+
+        /* ── Action buttons ── */
+        .action-btn {
+            padding: 5px 12px; border-radius: 7px; font-size: 12px;
+            font-weight: 600; cursor: pointer; border: 1px solid transparent;
+            margin-left: 4px; transition: all .18s; font-family: 'DM Sans', sans-serif;
+        }
+        .action-btn-blue   { background: rgba(239,108,82,.12); color: #EF6C52; border-color: rgba(239,108,82,.30); }
+        .action-btn-blue:hover { background: rgba(239,108,82,.22); }
+        .action-btn-yellow { background: rgba(245,158,11,.1); color: #d97706; border-color: rgba(245,158,11,.30); }
+        .action-btn-yellow:hover { background: rgba(245,158,11,.2); }
+
+        /* ── Report cards ── */
+        #patientReportsModal .modal { max-width: 680px; width: 95vw; }
+        #patientReportsModal .modal-body { max-height: 65vh; overflow-y: auto; }
+
+        /* ── Log action pill ── */
+        .log-action-pill {
+            font-family: monospace; font-size: 12px;
+            background: rgba(59,130,246,.08);
+            color: #3b82f6;
+            padding: 2px 8px; border-radius: 5px;
+            border: 1px solid rgba(59,130,246,.18);
+        }
+
+        /* ── Analytics grid ── */
+        .analytics-charts-grid {
+            display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px;
+        }
+        @media(max-width:900px){ .analytics-charts-grid{ grid-template-columns:1fr; } }
     </style>
 </head>
 <body>
 <div id="sidebarOverlay" class="sidebar-overlay" onclick="toggleSidebar()"></div>
 <div class="layout">
     <?php include __DIR__ . '/../includes/sidebar_admin.php'; ?>
-    <div class="main-content">
 
+    <div class="main-content">
         <div class="topbar">
             <div class="topbar-left">
                 <button class="menu-toggle" onclick="toggleSidebar()">
-                    <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/></svg>
+                    <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/>
+                    </svg>
                 </button>
                 <span class="page-title">Admin Dashboard</span>
             </div>
@@ -399,334 +360,467 @@ $activeAlerts  = count(array_filter($patients, fn($p) => ($p['hr_status'] ?? '')
         <div class="page-content">
 
             <?php if ($msg): ?>
-            <div style="background:<?= $msgType==='success'?'var(--green-bg)':'var(--red-bg)' ?>;border:1px solid <?= $msgType==='success'?'var(--green-border)':'var(--red-border)' ?>;color:<?= $msgType==='success'?'var(--green)':'var(--red)' ?>;border-radius:var(--radius-sm);padding:12px 16px;font-size:13px;margin-bottom:16px;">
+            <div style="background:<?= $msgType==='success'?'rgba(16,185,129,.1)':'rgba(239,68,68,.1)' ?>;border:1px solid <?= $msgType==='success'?'rgba(16,185,129,.3)':'rgba(239,68,68,.3)' ?>;color:<?= $msgType==='success'?'#10b981':'#ef4444' ?>;border-radius:10px;padding:12px 16px;font-size:13px;margin-bottom:20px;font-weight:600;">
                 <?= $msgType==='success'?'✓':'⚠️' ?> <?= htmlspecialchars($msg) ?>
             </div>
             <?php endif; ?>
 
             <!-- TABS -->
-            <div class="section-card" style="margin-bottom:0;border-radius:var(--radius) var(--radius) 0 0">
-                <div class="tabs" style="flex-wrap:wrap">
-                    <button class="tab-btn <?= $tab==='overview' ?'active':'' ?>" onclick="location.href='?tab=overview'">Overview</button>
-                    <button class="tab-btn <?= $tab==='users'    ?'active':'' ?>" onclick="location.href='?tab=users'">Users</button>
-                    <button class="tab-btn <?= $tab==='patients' ?'active':'' ?>" onclick="location.href='?tab=patients'">Patients</button>
-                    <button class="tab-btn <?= $tab==='devices'  ?'active':'' ?>" onclick="location.href='?tab=devices'">Devices</button>
-                    <button class="tab-btn <?= $tab==='analytics'?'active':'' ?>" onclick="location.href='?tab=analytics'">Analytics</button>
-                    <button class="tab-btn <?= $tab==='logs'     ?'active':'' ?>" onclick="location.href='?tab=logs'">System Logs</button>
+            <div class="section-card" style="margin-bottom:24px">
+                <div class="tabs">
+                    <button class="tab-btn <?= $tab==='overview' ?'active':'' ?>" onclick="location.href='?tab=overview'">
+                        <i class="fa-solid fa-chart-pie" style="margin-right:5px;font-size:11px"></i>Overview
+                    </button>
+                    <button class="tab-btn <?= $tab==='users' ?'active':'' ?>" onclick="location.href='?tab=users'">
+                        <i class="fa-solid fa-users" style="margin-right:5px;font-size:11px"></i>Users
+                    </button>
+                    <button class="tab-btn <?= $tab==='patients' ?'active':'' ?>" onclick="location.href='?tab=patients'">
+                        <i class="fa-solid fa-user-injured" style="margin-right:5px;font-size:11px"></i>Patients
+                    </button>
+                    <button class="tab-btn <?= $tab==='devices' ?'active':'' ?>" onclick="location.href='?tab=devices'">
+                        <i class="fa-solid fa-microchip" style="margin-right:5px;font-size:11px"></i>Devices
+                    </button>
+                    <button class="tab-btn <?= $tab==='analytics' ?'active':'' ?>" onclick="location.href='?tab=analytics'">
+                        <i class="fa-solid fa-chart-line" style="margin-right:5px;font-size:11px"></i>Analytics
+                    </button>
+                    <button class="tab-btn <?= $tab==='logs' ?'active':'' ?>" onclick="location.href='?tab=logs'">
+                        <i class="fa-solid fa-clipboard-list" style="margin-right:5px;font-size:11px"></i>System Logs
+                    </button>
                 </div>
             </div>
 
             <!-- ══ OVERVIEW ══ -->
             <?php if ($tab === 'overview'): ?>
-            <div style="padding:24px 0 0">
-                <div class="stats-grid stats-grid-4 mb-6">
-                    <div class="stat-card card-blue">
-                        <div class="stat-card-header"><div class="stat-icon blue"><svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4" stroke-width="2"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg></div></div>
-                        <div class="stat-label">Total Users</div><div class="stat-value"><?= $totalUsers ?></div><div class="stat-sub">All roles combined</div>
+
+            <div class="stats-grid stats-grid-4 mb-6">
+                <div class="stat-card card-blue">
+                    <div class="stat-card-header">
+                        <div class="stat-icon blue">
+                            <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4" stroke-width="2"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+                        </div>
                     </div>
-                    <div class="stat-card card-green">
-                        <div class="stat-card-header"><div class="stat-icon green"><svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4" stroke-width="2"/></svg></div></div>
-                        <div class="stat-label">Total Patients</div><div class="stat-value"><?= $totalPatients ?></div><div class="stat-sub">Registered patients</div>
+                    <div class="stat-label">Total Users</div>
+                    <div class="stat-value"><?= $totalUsers ?></div>
+                    <div class="stat-sub">All roles combined</div>
+                </div>
+                <div class="stat-card card-green">
+                    <div class="stat-card-header">
+                        <div class="stat-icon green">
+                            <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4" stroke-width="2"/></svg>
+                        </div>
                     </div>
-                    <div class="stat-card card-red">
-                        <div class="stat-card-header"><div class="stat-icon red"><svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/></svg></div></div>
-                        <div class="stat-label">Active Alerts</div><div class="stat-value text-red"><?= $activeAlerts ?></div><div class="stat-sub">Critical patients now</div>
+                    <div class="stat-label">Total Patients</div>
+                    <div class="stat-value"><?= $totalPatients ?></div>
+                    <div class="stat-sub">Registered patients</div>
+                </div>
+                <div class="stat-card card-red">
+                    <div class="stat-card-header">
+                        <div class="stat-icon red">
+                            <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/></svg>
+                        </div>
                     </div>
-                    <div class="stat-card card-purple">
-                        <div class="stat-card-header"><div class="stat-icon purple"><svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="14" rx="2" stroke-width="2"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 21h8M12 17v4"/></svg></div></div>
-                        <div class="stat-label">Total Devices</div><div class="stat-value"><?= count($devices) ?></div><div class="stat-sub">In inventory</div>
+                    <div class="stat-label">Active Alerts</div>
+                    <div class="stat-value text-red"><?= $activeAlerts ?></div>
+                    <div class="stat-sub">Critical patients now</div>
+                </div>
+                <div class="stat-card card-purple">
+                    <div class="stat-card-header">
+                        <div class="stat-icon purple">
+                            <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="14" rx="2" stroke-width="2"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 21h8M12 17v4"/></svg>
+                        </div>
+                    </div>
+                    <div class="stat-label">Total Devices</div>
+                    <div class="stat-value"><?= count($devices) ?></div>
+                    <div class="stat-sub">In inventory</div>
+                </div>
+            </div>
+
+            <!-- User Role Distribution -->
+            <div class="section-card">
+                <div class="section-header">
+                    <div class="section-title">
+                        <i class="fa-solid fa-users" style="color:#EF6C52;margin-right:8px;font-size:13px"></i>User Role Distribution
                     </div>
                 </div>
-
-                <div class="section-card">
-                    <div class="section-header"><div class="section-title">User Role Distribution</div></div>
-                    <div style="padding:20px;display:grid;grid-template-columns:repeat(4,1fr);gap:14px">
-                        <?php
-                        $roles      = ['admin'=>0,'manager'=>0,'rescuer'=>0,'responder'=>0];
-                        $roleColors = ['admin'=>'red','manager'=>'blue','rescuer'=>'yellow','responder'=>'green'];
-                        foreach ($users as $u) { if (isset($roles[$u['role']])) $roles[$u['role']]++; }
-                        foreach ($roles as $r => $count): ?>
-                        <div style="background:var(--bg-surface);border:1px solid var(--border);border-radius:var(--radius-sm);padding:16px;text-align:center">
-                            <div style="font-size:28px;font-weight:700;color:var(--<?= $roleColors[$r] ?>)"><?= $count ?></div>
-                            <div style="font-size:12px;color:var(--text-muted);text-transform:capitalize;margin-top:4px"><?= ucfirst($r) ?>s</div>
+                <div style="padding:20px;display:grid;grid-template-columns:repeat(4,1fr);gap:16px">
+                    <?php
+                    $roles      = ['admin'=>0,'manager'=>0,'rescuer'=>0,'responder'=>0];
+                    $roleColors = ['admin'=>'mic-red','manager'=>'mic-blue','rescuer'=>'mic-yellow','responder'=>'mic-coral'];
+                    $roleIcons  = ['admin'=>'fa-shield-halved','manager'=>'fa-briefcase','rescuer'=>'fa-person-running','responder'=>'fa-radio'];
+                    foreach ($users as $u) { if (isset($roles[$u['role']])) $roles[$u['role']]++; }
+                    foreach ($roles as $r => $count): ?>
+                    <div class="mini-info-card">
+                        <div class="mic-value <?= $roleColors[$r] ?>"><?= $count ?></div>
+                        <div class="mic-label">
+                            <i class="fa-solid <?= $roleIcons[$r] ?>" style="margin-right:4px;opacity:.6"></i>
+                            <?= ucfirst($r) ?>s
                         </div>
-                        <?php endforeach; ?>
                     </div>
+                    <?php endforeach; ?>
                 </div>
+            </div>
 
-                <!-- Quick device summary -->
-                <div class="section-card" style="margin-top:20px">
-                    <div class="section-header">
-                        <div class="section-title">Device Inventory Summary</div>
-                        <button class="btn btn-ghost btn-sm" onclick="location.href='?tab=devices'">Manage Devices →</button>
+            <!-- Device Inventory Summary -->
+            <div class="section-card" style="margin-top:20px">
+                <div class="section-header">
+                    <div class="section-title">
+                        <i class="fa-solid fa-microchip" style="color:#EF6C52;margin-right:8px;font-size:13px"></i>Device Inventory Summary
                     </div>
-                    <div style="padding:20px;display:grid;grid-template-columns:repeat(4,1fr);gap:14px">
-                        <?php
-                        $ds = [['label'=>'Usable','count'=>$deviceStats['usable'],'color'=>'#10b981'],['label'=>'In-Use','count'=>$deviceStats['in-use'],'color'=>'#3b82f6'],['label'=>'Maintenance','count'=>$deviceStats['maintenance'],'color'=>'#f59e0b'],['label'=>'Disposable','count'=>$deviceStats['disposable'],'color'=>'#ef4444']];
-                        foreach ($ds as $d): ?>
-                        <div style="background:var(--bg-surface);border:1px solid var(--border);border-radius:var(--radius-sm);padding:16px;text-align:center">
-                            <div style="font-size:26px;font-weight:700;color:<?= $d['color'] ?>"><?= $d['count'] ?></div>
-                            <div style="font-size:12px;color:var(--text-muted);margin-top:4px"><?= $d['label'] ?></div>
+                    <button class="btn btn-ghost btn-sm" onclick="location.href='?tab=devices'">
+                        Manage Devices <i class="fa-solid fa-arrow-right" style="font-size:10px"></i>
+                    </button>
+                </div>
+                <div style="padding:20px;display:grid;grid-template-columns:repeat(4,1fr);gap:16px">
+                    <?php
+                    $ds = [
+                        ['label'=>'Usable',      'count'=>$deviceStats['usable'],      'color'=>'#10b981', 'icon'=>'fa-circle-check'],
+                        ['label'=>'In-Use',       'count'=>$deviceStats['in-use'],       'color'=>'#3b82f6', 'icon'=>'fa-circle-dot'],
+                        ['label'=>'Maintenance',  'count'=>$deviceStats['maintenance'],  'color'=>'#f59e0b', 'icon'=>'fa-wrench'],
+                        ['label'=>'Disposable',   'count'=>$deviceStats['disposable'],   'color'=>'#ef4444', 'icon'=>'fa-trash'],
+                    ];
+                    foreach ($ds as $d): ?>
+                    <div class="mini-info-card">
+                        <div class="mic-value" style="color:<?= $d['color'] ?>"><?= $d['count'] ?></div>
+                        <div class="mic-label">
+                            <i class="fa-solid <?= $d['icon'] ?>" style="margin-right:4px;opacity:.6"></i>
+                            <?= $d['label'] ?>
                         </div>
-                        <?php endforeach; ?>
                     </div>
+                    <?php endforeach; ?>
                 </div>
             </div>
 
             <!-- ══ USERS ══ -->
             <?php elseif ($tab === 'users'): ?>
-            <div style="padding:20px 0 0">
-                <div class="section-card">
-                    <div class="section-header">
-                        <div><div class="section-title">All Users</div><div class="section-subtitle"><?= count($users) ?> registered</div></div>
-                        <button class="btn btn-primary btn-sm" onclick="openModal('addUserModal')">
-                            <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
-                            Add User
-                        </button>
+
+            <div class="section-card">
+                <div class="section-header">
+                    <div>
+                        <div class="section-title"><i class="fa-solid fa-users" style="color:#EF6C52;margin-right:8px;font-size:13px"></i>All Users</div>
+                        <div class="section-subtitle"><?= count($users) ?> registered</div>
                     </div>
-                    <div class="table-container">
-                        <table>
-                            <thead><tr><th>Name</th><th>Username</th><th>Role</th><th>Email</th><th>Status</th><th>Created</th><th>Actions</th></tr></thead>
-                            <tbody>
-                            <?php foreach ($users as $u): ?>
-                            <tr>
-                                <td style="font-weight:600"><?= htmlspecialchars($u['full_name']) ?></td>
-                                <td class="td-muted font-mono"><?= htmlspecialchars($u['username']) ?></td>
-                                <td><span class="badge badge-<?= $u['role'] ?>"><?= ucfirst($u['role']) ?></span></td>
-                                <td class="td-muted"><?= htmlspecialchars($u['email']??'—') ?></td>
-                                <td><span class="badge" style="<?= ($u['status']??'active')==='active'?'background:var(--green-bg);color:var(--green);border:1px solid var(--green-border)':'background:var(--red-bg);color:var(--red);border:1px solid var(--red-border)' ?>">
-                                    <?= ucfirst($u['status']??'active') ?></span></td>
-                                <td class="td-muted"><?= date('M d, Y', strtotime($u['created_at'])) ?></td>
-                                <td>
-                                    <button class="btn btn-ghost btn-sm" onclick="openEditUser(<?= htmlspecialchars(json_encode($u)) ?>)">Edit</button>
-                                    <?php if ((int)$u['id'] !== (int)$user['id']): ?>
-                                    <a href="?tab=users&delete_user=<?= $u['id'] ?>" class="btn btn-danger btn-sm"
-                                       onclick="return confirm('Delete user <?= htmlspecialchars($u['full_name'], ENT_QUOTES) ?>?')">Delete</a>
-                                    <?php endif; ?>
-                                </td>
-                            </tr>
-                            <?php endforeach; ?>
-                            </tbody>
-                        </table>
-                    </div>
+                    <button class="btn btn-primary btn-sm" onclick="openModal('addUserModal')">
+                        <i class="fa-solid fa-plus"></i> Add User
+                    </button>
+                </div>
+                <div class="table-container">
+                    <table>
+                        <thead><tr><th>Name</th><th>Username</th><th>Role</th><th>Email</th><th>Status</th><th>Created</th><th>Actions</th></tr></thead>
+                        <tbody>
+                        <?php foreach ($users as $u): ?>
+                        <tr>
+                            <td style="font-weight:700"><?= htmlspecialchars($u['full_name']) ?></td>
+                            <td class="td-muted font-mono"><?= htmlspecialchars($u['username']) ?></td>
+                            <td><span class="badge badge-<?= $u['role'] ?>"><?= ucfirst($u['role']) ?></span></td>
+                            <td class="td-muted"><?= htmlspecialchars($u['email']??'—') ?></td>
+                            <td>
+                                <span class="badge" style="<?= ($u['status']??'active')==='active'
+                                    ?'background:rgba(16,185,129,.1);color:#10b981;border:1px solid rgba(16,185,129,.25)'
+                                    :'background:rgba(239,68,68,.1);color:#ef4444;border:1px solid rgba(239,68,68,.25)' ?>">
+                                    <?= ucfirst($u['status']??'active') ?>
+                                </span>
+                            </td>
+                            <td class="td-muted"><?= date('M d, Y', strtotime($u['created_at'])) ?></td>
+                            <td>
+                                <button class="btn btn-ghost btn-sm" onclick="openEditUser(<?= htmlspecialchars(json_encode($u)) ?>)">
+                                    <i class="fa-solid fa-pen"></i> Edit
+                                </button>
+                                <?php if ((int)$u['id'] !== (int)$user['id']): ?>
+                                <a href="?tab=users&delete_user=<?= $u['id'] ?>" class="btn btn-danger btn-sm"
+                                   onclick="return confirm('Delete user <?= htmlspecialchars($u['full_name'], ENT_QUOTES) ?>?')">
+                                    <i class="fa-solid fa-trash"></i>
+                                </a>
+                                <?php endif; ?>
+                            </td>
+                        </tr>
+                        <?php endforeach; ?>
+                        </tbody>
+                    </table>
                 </div>
             </div>
 
             <!-- ══ PATIENTS ══ -->
             <?php elseif ($tab === 'patients'): ?>
-            <div style="padding:20px 0 0">
-                <div class="section-card">
-                    <div class="section-header">
-                        <div><div class="section-title">All Patients</div><div class="section-subtitle"><?= count($patients) ?> registered</div></div>
-                        <button class="btn btn-primary btn-sm" onclick="openModal('addPatientModal')">
-                            <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
-                            Add Patient
-                        </button>
+
+            <div class="section-card">
+                <div class="section-header">
+                    <div>
+                        <div class="section-title"><i class="fa-solid fa-user-injured" style="color:#EF6C52;margin-right:8px;font-size:13px"></i>All Patients</div>
+                        <div class="section-subtitle"><?= count($patients) ?> registered</div>
                     </div>
-                    <div class="table-container">
-                        <table>
-                            <thead><tr><th>Name</th><th>Age</th><th>Condition</th><th>Rescuer</th><th>Heart Rate</th><th>Status</th><th>Actions</th></tr></thead>
-                            <tbody>
-                            <?php foreach ($patients as $p):
-                                $hr = $p['heart_rate'] ?? '—';
-                                $st = $p['hr_status']  ?? 'normal';
-                                $bc = ['normal'=>'badge-normal','warning'=>'badge-warning','critical'=>'badge-critical'][$st] ?? 'badge-normal';
-                                $bl = ['normal'=>'Normal','warning'=>'Warning','critical'=>'Critical'][$st] ?? 'Normal';
-                                // Count reports for this patient
-                                $rptCount = isset($reportsByPatient[$p['id']]) ? count($reportsByPatient[$p['id']]) : 0;
-                            ?>
-                            <tr>
-                                <td style="font-weight:600"><?= htmlspecialchars($p['name']) ?></td>
-                                <td class="td-muted"><?= $p['age'] ?></td>
-                                <td class="td-muted"><?= htmlspecialchars($p['medical_condition']??'—') ?></td>
-                                <td class="td-muted"><?= htmlspecialchars($p['rescuer_name']??'Unassigned') ?></td>
-                                <td>
-                                    <?php if (is_numeric($hr)): ?>
-                                    <span class="bpm-value <?= ['normal'=>'bpm-normal','warning'=>'bpm-warning','critical'=>'bpm-critical'][$st]??'bpm-normal' ?>" style="font-size:16px"><?= $hr ?></span>
-                                    <span style="font-size:11px;color:var(--text-muted)"> BPM</span>
-                                    <?php else: ?>—<?php endif; ?>
-                                </td>
-                                <td><span class="badge <?= $bc ?>"><?= $bl ?></span></td>
-                                <td>
-                                    <!-- View Reports Button -->
-                                    <button class="btn btn-ghost btn-sm"
-                                        onclick="openPatientReports(<?= $p['id'] ?>, '<?= htmlspecialchars($p['name'], ENT_QUOTES) ?>', <?= $p['age'] ?>, '<?= htmlspecialchars($p['medical_condition']??'—', ENT_QUOTES) ?>')"
-                                        style="color:#818cf8;border-color:rgba(99,102,241,.3)">
-                                        📋 Reports
-                                        <?php if ($rptCount > 0): ?>
-                                        <span class="report-count-badge"><?= $rptCount ?></span>
-                                        <?php endif; ?>
-                                    </button>
-                                    <button class="btn btn-ghost btn-sm" onclick="openEditPatient(<?= htmlspecialchars(json_encode($p)) ?>)">Edit</button>
-                                    <a href="?tab=patients&delete_patient=<?= $p['id'] ?>" class="btn btn-danger btn-sm"
-                                       onclick="return confirm('Delete patient <?= htmlspecialchars($p['name'], ENT_QUOTES) ?>?')">Delete</a>
-                                </td>
-                            </tr>
-                            <?php endforeach; ?>
-                            </tbody>
-                        </table>
-                    </div>
+                    <button class="btn btn-primary btn-sm" onclick="openModal('addPatientModal')">
+                        <i class="fa-solid fa-plus"></i> Add Patient
+                    </button>
+                </div>
+                <div class="table-container">
+                    <table>
+                        <thead><tr><th>Name</th><th>Age</th><th>Condition</th><th>Rescuer</th><th>Heart Rate</th><th>Status</th><th>Actions</th></tr></thead>
+                        <tbody>
+                        <?php foreach ($patients as $p):
+                            $hr = $p['heart_rate'] ?? '—';
+                            $st = $p['hr_status']  ?? 'normal';
+                            $bc = ['normal'=>'badge-normal','warning'=>'badge-warning','critical'=>'badge-critical'][$st] ?? 'badge-normal';
+                            $bl = ['normal'=>'Normal','warning'=>'Warning','critical'=>'Critical'][$st] ?? 'Normal';
+                            $bpmCls = ['normal'=>'bpm-normal','warning'=>'bpm-warning','critical'=>'bpm-critical'][$st] ?? 'bpm-normal';
+                            $rptCount = isset($reportsByPatient[$p['id']]) ? count($reportsByPatient[$p['id']]) : 0;
+                        ?>
+                        <tr>
+                            <td style="font-weight:700"><?= htmlspecialchars($p['name']) ?></td>
+                            <td class="td-muted"><?= $p['age'] ?></td>
+                            <td class="td-muted"><?= htmlspecialchars($p['medical_condition']??'—') ?></td>
+                            <td class="td-muted"><?= htmlspecialchars($p['rescuer_name']??'Unassigned') ?></td>
+                            <td>
+                                <?php if (is_numeric($hr)): ?>
+                                <span class="bpm-value <?= $bpmCls ?>"><?= $hr ?></span>
+                                <span style="font-size:11px;color:#9CA3AF"> BPM</span>
+                                <?php else: ?>—<?php endif; ?>
+                            </td>
+                            <td><span class="badge <?= $bc ?>"><?= $bl ?></span></td>
+                            <td>
+                                <button class="btn btn-ghost btn-sm"
+                                    onclick="openPatientReports(<?= $p['id'] ?>, '<?= htmlspecialchars($p['name'], ENT_QUOTES) ?>', <?= $p['age'] ?>, '<?= htmlspecialchars($p['medical_condition']??'—', ENT_QUOTES) ?>')"
+                                    style="color:#6366f1;border-color:rgba(99,102,241,.25)">
+                                    <i class="fa-solid fa-clipboard-list"></i> Reports
+                                    <?php if ($rptCount > 0): ?>
+                                    <span class="report-count-badge"><?= $rptCount ?></span>
+                                    <?php endif; ?>
+                                </button>
+                                <button class="btn btn-ghost btn-sm" onclick="openEditPatient(<?= htmlspecialchars(json_encode($p)) ?>)">
+                                    <i class="fa-solid fa-pen"></i> Edit
+                                </button>
+                                <a href="?tab=patients&delete_patient=<?= $p['id'] ?>" class="btn btn-danger btn-sm"
+                                   onclick="return confirm('Delete patient <?= htmlspecialchars($p['name'], ENT_QUOTES) ?>?')">
+                                    <i class="fa-solid fa-trash"></i>
+                                </a>
+                            </td>
+                        </tr>
+                        <?php endforeach; ?>
+                        </tbody>
+                    </table>
                 </div>
             </div>
 
             <!-- ══ DEVICES ══ -->
             <?php elseif ($tab === 'devices'): ?>
-            <div style="padding:20px 0 0">
-                <div class="device-stats-grid">
-                    <div class="device-mini-card"><div class="dmc-label">Usable</div><div class="dmc-count" style="color:#10b981"><?= $deviceStats['usable'] ?></div><div style="font-size:11px;color:#64748b">Ready</div></div>
-                    <div class="device-mini-card"><div class="dmc-label">In-Use</div><div class="dmc-count" style="color:#3b82f6"><?= $deviceStats['in-use'] ?></div><div style="font-size:11px;color:#64748b">Assigned</div></div>
-                    <div class="device-mini-card"><div class="dmc-label">Maintenance</div><div class="dmc-count" style="color:#f59e0b"><?= $deviceStats['maintenance'] ?></div><div style="font-size:11px;color:#64748b">Repair</div></div>
-                    <div class="device-mini-card"><div class="dmc-label">Disposable</div><div class="dmc-count" style="color:#ef4444"><?= $deviceStats['disposable'] ?></div><div style="font-size:11px;color:#64748b">Decommissioned</div></div>
+
+            <div class="device-stats-grid">
+                <div class="device-mini-card">
+                    <div class="dmc-label">Usable</div>
+                    <div class="dmc-count" style="color:#10b981"><?= $deviceStats['usable'] ?></div>
+                    <div class="dmc-sub">Ready to deploy</div>
                 </div>
-                <div class="section-card">
-                    <div class="section-header">
-                        <div><div class="section-title">All Devices</div><div class="section-subtitle"><?= count($devices) ?> in inventory</div></div>
-                        <button class="btn btn-primary btn-sm" onclick="openModal('addDeviceModal')">+ Add Device</button>
+                <div class="device-mini-card">
+                    <div class="dmc-label">In-Use</div>
+                    <div class="dmc-count" style="color:#3b82f6"><?= $deviceStats['in-use'] ?></div>
+                    <div class="dmc-sub">Currently assigned</div>
+                </div>
+                <div class="device-mini-card">
+                    <div class="dmc-label">Maintenance</div>
+                    <div class="dmc-count" style="color:#f59e0b"><?= $deviceStats['maintenance'] ?></div>
+                    <div class="dmc-sub">Under repair</div>
+                </div>
+                <div class="device-mini-card">
+                    <div class="dmc-label">Disposable</div>
+                    <div class="dmc-count" style="color:#ef4444"><?= $deviceStats['disposable'] ?></div>
+                    <div class="dmc-sub">Decommissioned</div>
+                </div>
+            </div>
+
+            <div class="section-card">
+                <div class="section-header">
+                    <div>
+                        <div class="section-title"><i class="fa-solid fa-microchip" style="color:#EF6C52;margin-right:8px;font-size:13px"></i>All Devices</div>
+                        <div class="section-subtitle"><?= count($devices) ?> in inventory</div>
                     </div>
-                    <div class="table-container">
-                        <table>
-                            <thead><tr><th>#</th><th>Label</th><th>Type</th><th>Serial No.</th><th>Status</th><th>Assigned To</th><th>Actions</th></tr></thead>
-                            <tbody>
-                            <?php if (empty($devices)): ?>
-                                <tr><td colspan="7" style="text-align:center;color:#64748b;padding:32px">No devices found.</td></tr>
-                            <?php endif; ?>
-                            <?php foreach ($devices as $i => $d):
-                                $assignedTo = $d['patient_name'] ? '👤 '.htmlspecialchars($d['patient_name'])
-                                            : ($d['user_name']   ? '🚑 '.htmlspecialchars($d['user_name']) : '—');
-                            ?>
-                            <tr>
-                                <td style="color:#64748b;font-size:13px"><?= $i+1 ?></td>
-                                <td style="font-weight:700"><?= htmlspecialchars($d['label']) ?></td>
-                                <td style="color:#94a3b8"><?= htmlspecialchars($d['type']) ?></td>
-                                <td style="font-family:monospace;font-size:13px;color:#64748b"><?= htmlspecialchars($d['serial_number']??'—') ?></td>
-                                <td>
-                                    <form method="POST" style="display:inline">
-                                        <input type="hidden" name="action" value="update_device_status">
-                                        <input type="hidden" name="device_id" value="<?= $d['id'] ?>">
-                                        <select name="status" class="status-select" onchange="this.form.submit()">
-                                            <option value="usable"      <?= $d['serial_status']==='usable'      ?'selected':'' ?>>✅ Usable</option>
-                                            <option value="in-use"      <?= $d['serial_status']==='in-use'      ?'selected':'' ?>>🔵 In-Use</option>
-                                            <option value="maintenance" <?= $d['serial_status']==='maintenance' ?'selected':'' ?>>🔧 Maintenance</option>
-                                            <option value="disposable"  <?= $d['serial_status']==='disposable'  ?'selected':'' ?>>🗑️ Disposable</option>
-                                        </select>
-                                    </form>
-                                </td>
-                                <td><?= $assignedTo ?></td>
-                                <td>
-                                    <?php if ($d['serial_status'] !== 'disposable'): ?>
-                                        <?php if ($d['serial_status'] !== 'in-use'): ?>
-                                            <button class="action-btn action-btn-blue" onclick="openAssignModal(<?= $d['id'] ?>,'<?= htmlspecialchars(addslashes($d['label'])) ?>')">Assign</button>
-                                        <?php else: ?>
-                                            <form method="POST" style="display:inline">
-                                                <input type="hidden" name="action" value="unassign_device">
-                                                <input type="hidden" name="device_id" value="<?= $d['id'] ?>">
-                                                <button type="submit" class="action-btn action-btn-yellow" onclick="return confirm('Unassign?')">Unassign</button>
-                                            </form>
-                                        <?php endif; ?>
+                    <button class="btn btn-primary btn-sm" onclick="openModal('addDeviceModal')">
+                        <i class="fa-solid fa-plus"></i> Add Device
+                    </button>
+                </div>
+                <div class="table-container">
+                    <table>
+                        <thead><tr><th>#</th><th>Label</th><th>Type</th><th>Serial No.</th><th>Status</th><th>Assigned To</th><th>Actions</th></tr></thead>
+                        <tbody>
+                        <?php if (empty($devices)): ?>
+                            <tr><td colspan="7" style="text-align:center;color:#9CA3AF;padding:40px">No devices found.</td></tr>
+                        <?php endif; ?>
+                        <?php foreach ($devices as $i => $d):
+                            $assignedTo = $d['patient_name'] ? '👤 '.htmlspecialchars($d['patient_name'])
+                                        : ($d['user_name']   ? '🚑 '.htmlspecialchars($d['user_name']) : '—');
+                        ?>
+                        <tr>
+                            <td class="td-muted"><?= $i+1 ?></td>
+                            <td style="font-weight:700"><?= htmlspecialchars($d['label']) ?></td>
+                            <td class="td-muted"><?= htmlspecialchars($d['type']) ?></td>
+                            <td style="font-family:monospace;font-size:12px;color:#9CA3AF"><?= htmlspecialchars($d['serial_number']??'—') ?></td>
+                            <td>
+                                <form method="POST" style="display:inline">
+                                    <input type="hidden" name="action" value="update_device_status">
+                                    <input type="hidden" name="device_id" value="<?= $d['id'] ?>">
+                                    <select name="status" class="status-select" onchange="this.form.submit()">
+                                        <option value="usable"      <?= $d['serial_status']==='usable'      ?'selected':'' ?>>✅ Usable</option>
+                                        <option value="in-use"      <?= $d['serial_status']==='in-use'      ?'selected':'' ?>>🔵 In-Use</option>
+                                        <option value="maintenance" <?= $d['serial_status']==='maintenance' ?'selected':'' ?>>🔧 Maintenance</option>
+                                        <option value="disposable"  <?= $d['serial_status']==='disposable'  ?'selected':'' ?>>🗑️ Disposable</option>
+                                    </select>
+                                </form>
+                            </td>
+                            <td class="td-muted"><?= $assignedTo ?></td>
+                            <td>
+                                <?php if ($d['serial_status'] !== 'disposable'): ?>
+                                    <?php if ($d['serial_status'] !== 'in-use'): ?>
+                                        <button class="action-btn action-btn-blue" onclick="openAssignModal(<?= $d['id'] ?>,'<?= htmlspecialchars(addslashes($d['label'])) ?>')">
+                                            <i class="fa-solid fa-link"></i> Assign
+                                        </button>
+                                    <?php else: ?>
+                                        <form method="POST" style="display:inline">
+                                            <input type="hidden" name="action" value="unassign_device">
+                                            <input type="hidden" name="device_id" value="<?= $d['id'] ?>">
+                                            <button type="submit" class="action-btn action-btn-yellow" onclick="return confirm('Unassign?')">
+                                                <i class="fa-solid fa-link-slash"></i> Unassign
+                                            </button>
+                                        </form>
                                     <?php endif; ?>
-                                    <a href="?tab=devices&delete_device=<?= $d['id'] ?>" class="action-btn" style="background:rgba(239,68,68,.15);color:#ef4444"
-                                       onclick="return confirm('Delete this device?')">Delete</a>
-                                </td>
-                            </tr>
-                            <?php endforeach; ?>
-                            </tbody>
-                        </table>
-                    </div>
+                                <?php endif; ?>
+                                <a href="?tab=devices&delete_device=<?= $d['id'] ?>" class="action-btn"
+                                   style="background:rgba(239,68,68,.1);color:#ef4444;border-color:rgba(239,68,68,.2)"
+                                   onclick="return confirm('Delete this device?')">
+                                    <i class="fa-solid fa-trash"></i>
+                                </a>
+                            </td>
+                        </tr>
+                        <?php endforeach; ?>
+                        </tbody>
+                    </table>
                 </div>
             </div>
 
             <!-- ══ ANALYTICS ══ -->
             <?php elseif ($tab === 'analytics'): ?>
-            <div style="padding:20px 0 0">
-                <?php
-                $normalPct = $totalLogs > 0 ? round($normalCnt / $totalLogs * 100) : 0;
-                $warnPct   = $totalLogs > 0 ? round($warnCnt   / $totalLogs * 100) : 0;
-                $critPct   = 100 - $normalPct - $warnPct;
-                ?>
-                <div class="stats-grid stats-grid-4 mb-6">
-                    <div class="stat-card card-purple"><div class="stat-label">Total Readings</div><div class="stat-value"><?= number_format($totalLogs) ?></div><div class="stat-sub">All time</div></div>
-                    <div class="stat-card card-green"><div class="stat-label">Normal</div><div class="stat-value text-green"><?= $normalPct ?>%</div><div class="stat-sub">60–99 BPM</div></div>
-                    <div class="stat-card card-yellow"><div class="stat-label">Warning</div><div class="stat-value text-yellow"><?= $warnPct ?>%</div><div class="stat-sub">100–120 BPM</div></div>
-                    <div class="stat-card card-red"><div class="stat-label">Critical</div><div class="stat-value text-red"><?= $critPct ?>%</div><div class="stat-sub">&lt;60 or &gt;120 BPM</div></div>
-                </div>
 
-                <div class="stats-grid stats-grid-2 mb-6">
-                    <div class="section-card">
-                        <div class="section-header"><div class="section-title">Hourly Heart Rate (Last 12h)</div></div>
-                        <?php if (empty($hourlyData)): ?>
-                            <div style="text-align:center;padding:60px 20px;color:#64748b">No data in last 12 hours.</div>
-                        <?php else: ?>
-                        <div class="chart-container"><div class="chart-wrapper" style="height:260px"><canvas id="hourlyChart"></canvas></div></div>
-                        <?php endif; ?>
-                    </div>
-                    <div class="section-card">
-                        <div class="section-header"><div class="section-title">Alert Distribution</div></div>
-                        <?php if (($normalCnt + $warnCnt + $critCnt) === 0): ?>
-                            <div style="text-align:center;padding:60px 20px;color:#64748b">No data.</div>
-                        <?php else: ?>
-                        <div class="chart-container" style="display:flex;align-items:center;justify-content:center;height:260px">
-                            <canvas id="alertPieChart" style="max-height:220px;max-width:220px"></canvas>
+            <?php
+            $normalPct = $totalLogs > 0 ? round($normalCnt / $totalLogs * 100) : 0;
+            $warnPct   = $totalLogs > 0 ? round($warnCnt   / $totalLogs * 100) : 0;
+            $critPct   = 100 - $normalPct - $warnPct;
+            ?>
+            <div class="stats-grid stats-grid-4 mb-6">
+                <div class="stat-card card-purple">
+                    <div class="stat-label">Total Readings</div>
+                    <div class="stat-value"><?= number_format($totalLogs) ?></div>
+                    <div class="stat-sub">All time</div>
+                </div>
+                <div class="stat-card card-green">
+                    <div class="stat-label">Normal</div>
+                    <div class="stat-value text-green"><?= $normalPct ?>%</div>
+                    <div class="stat-sub">60–99 BPM</div>
+                </div>
+                <div class="stat-card card-yellow">
+                    <div class="stat-label">Warning</div>
+                    <div class="stat-value text-yellow"><?= $warnPct ?>%</div>
+                    <div class="stat-sub">100–120 BPM</div>
+                </div>
+                <div class="stat-card card-red">
+                    <div class="stat-label">Critical</div>
+                    <div class="stat-value text-red"><?= $critPct ?>%</div>
+                    <div class="stat-sub">&lt;60 or &gt;120 BPM</div>
+                </div>
+            </div>
+
+            <div class="analytics-charts-grid">
+                <div class="section-card" style="margin-bottom:0">
+                    <div class="section-header">
+                        <div class="section-title">
+                            <i class="fa-solid fa-chart-area" style="color:#EF6C52;margin-right:8px;font-size:13px"></i>Hourly Heart Rate (Last 12h)
                         </div>
-                        <?php endif; ?>
+                    </div>
+                    <?php if (empty($hourlyData)): ?>
+                        <div style="text-align:center;padding:60px 20px;color:#9CA3AF">No data in last 12 hours.</div>
+                    <?php else: ?>
+                    <div class="chart-container"><div class="chart-wrapper" style="height:260px"><canvas id="hourlyChart"></canvas></div></div>
+                    <?php endif; ?>
+                </div>
+                <div class="section-card" style="margin-bottom:0">
+                    <div class="section-header">
+                        <div class="section-title">
+                            <i class="fa-solid fa-circle-half-stroke" style="color:#EF6C52;margin-right:8px;font-size:13px"></i>Alert Distribution
+                        </div>
+                    </div>
+                    <?php if (($normalCnt + $warnCnt + $critCnt) === 0): ?>
+                        <div style="text-align:center;padding:60px 20px;color:#9CA3AF">No data.</div>
+                    <?php else: ?>
+                    <div style="display:flex;align-items:center;justify-content:center;height:280px">
+                        <canvas id="alertPieChart" style="max-height:220px;max-width:220px"></canvas>
+                    </div>
+                    <?php endif; ?>
+                </div>
+            </div>
+
+            <div class="section-card">
+                <div class="section-header">
+                    <div class="section-title">
+                        <i class="fa-solid fa-people-group" style="color:#EF6C52;margin-right:8px;font-size:13px"></i>Rescuer Performance
                     </div>
                 </div>
-
-                <div class="section-card">
-                    <div class="section-header"><div class="section-title">Rescuer Performance</div></div>
-                    <div class="table-container">
-                        <table>
-                            <thead><tr><th>Rescuer</th><th>Patients Assigned</th><th>Incident Reports</th><th>Load Level</th></tr></thead>
-                            <tbody>
-                            <?php foreach ($rescuerPerf as $r):
-                                $load = $r['patient_count'] >= 4 ? 'High' : ($r['patient_count'] >= 2 ? 'Medium' : 'Low');
-                                $lc   = $r['patient_count'] >= 4 ? 'badge-critical' : ($r['patient_count'] >= 2 ? 'badge-warning' : 'badge-normal');
-                            ?>
-                            <tr>
-                                <td style="font-weight:600"><?= htmlspecialchars($r['full_name']) ?></td>
-                                <td><span style="font-size:18px;font-weight:700;color:var(--blue)"><?= $r['patient_count'] ?></span></td>
-                                <td><?= $r['report_count'] ?></td>
-                                <td><span class="badge <?= $lc ?>"><?= $load ?></span></td>
-                            </tr>
-                            <?php endforeach; ?>
-                            </tbody>
-                        </table>
-                    </div>
+                <div class="table-container">
+                    <table>
+                        <thead><tr><th>Rescuer</th><th>Patients Assigned</th><th>Incident Reports</th><th>Load Level</th></tr></thead>
+                        <tbody>
+                        <?php foreach ($rescuerPerf as $r):
+                            $load = $r['patient_count'] >= 4 ? 'High' : ($r['patient_count'] >= 2 ? 'Medium' : 'Low');
+                            $lc   = $r['patient_count'] >= 4 ? 'badge-critical' : ($r['patient_count'] >= 2 ? 'badge-warning' : 'badge-normal');
+                        ?>
+                        <tr>
+                            <td style="font-weight:700"><?= htmlspecialchars($r['full_name']) ?></td>
+                            <td><span style="font-size:20px;font-weight:800;color:#1E2450"><?= $r['patient_count'] ?></span></td>
+                            <td><span style="font-size:14px;font-weight:700;color:#374151"><?= $r['report_count'] ?></span></td>
+                            <td><span class="badge <?= $lc ?>"><?= $load ?></span></td>
+                        </tr>
+                        <?php endforeach; ?>
+                        </tbody>
+                    </table>
                 </div>
             </div>
 
             <!-- ══ LOGS ══ -->
             <?php elseif ($tab === 'logs'): ?>
-            <div style="padding:20px 0 0">
-                <div class="section-card">
-                    <div class="section-header"><div><div class="section-title">System Logs</div><div class="section-subtitle">Last 100 actions</div></div></div>
-                    <div class="table-container">
-                        <table>
-                            <thead><tr><th>User</th><th>Role</th><th>Action</th><th>Details</th><th>Time</th></tr></thead>
-                            <tbody>
-                            <?php foreach ($logs as $l): ?>
-                            <tr>
-                                <td style="font-weight:600"><?= htmlspecialchars($l['full_name']??'System') ?></td>
-                                <td><?php if (!empty($l['role'])): ?><span class="badge badge-<?= $l['role'] ?>"><?= ucfirst($l['role']) ?></span><?php endif; ?></td>
-                                <td><span style="font-family:monospace;font-size:12px;background:var(--bg-input);padding:2px 6px;border-radius:4px;color:var(--blue)"><?= htmlspecialchars($l['action']) ?></span></td>
-                                <td class="td-muted"><?= htmlspecialchars($l['details']??'—') ?></td>
-                                <td class="td-muted"><?= date('M d H:i:s', strtotime($l['timestamp'])) ?></td>
-                            </tr>
-                            <?php endforeach; ?>
-                            </tbody>
-                        </table>
+
+            <div class="section-card">
+                <div class="section-header">
+                    <div>
+                        <div class="section-title"><i class="fa-solid fa-clipboard-list" style="color:#EF6C52;margin-right:8px;font-size:13px"></i>System Logs</div>
+                        <div class="section-subtitle">Last 100 actions</div>
                     </div>
                 </div>
+                <div class="table-container">
+                    <table>
+                        <thead><tr><th>User</th><th>Role</th><th>Action</th><th>Details</th><th>Time</th></tr></thead>
+                        <tbody>
+                        <?php foreach ($logs as $l): ?>
+                        <tr>
+                            <td style="font-weight:700"><?= htmlspecialchars($l['full_name']??'System') ?></td>
+                            <td><?php if (!empty($l['role'])): ?><span class="badge badge-<?= $l['role'] ?>"><?= ucfirst($l['role']) ?></span><?php endif; ?></td>
+                            <td><span class="log-action-pill"><?= htmlspecialchars($l['action']) ?></span></td>
+                            <td class="td-muted"><?= htmlspecialchars($l['details']??'—') ?></td>
+                            <td class="td-muted"><?= date('M d H:i:s', strtotime($l['timestamp'])) ?></td>
+                        </tr>
+                        <?php endforeach; ?>
+                        </tbody>
+                    </table>
+                </div>
             </div>
+
             <?php endif; ?>
 
-        </div>
-    </div>
-</div>
+        </div><!-- /.page-content -->
+    </div><!-- /.main-content -->
+</div><!-- /.layout -->
 
-<!-- MODAL: Add User -->
+<!-- ══ MODAL: Add User ══ -->
 <div class="modal-overlay" id="addUserModal">
     <div class="modal">
-        <div class="modal-header"><div class="modal-title">Add New User</div><button class="modal-close" onclick="closeModal('addUserModal')">×</button></div>
+        <div class="modal-header">
+            <div class="modal-title"><i class="fa-solid fa-user-plus" style="color:#EF6C52;margin-right:8px"></i>Add New User</div>
+            <button class="modal-close" onclick="closeModal('addUserModal')">×</button>
+        </div>
         <form method="POST" action="?tab=users">
             <input type="hidden" name="action" value="add_user">
             <div class="modal-body">
@@ -748,16 +842,19 @@ $activeAlerts  = count(array_filter($patients, fn($p) => ($p['hr_status'] ?? '')
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-ghost" onclick="closeModal('addUserModal')">Cancel</button>
-                <button type="submit" class="btn btn-primary">Add User</button>
+                <button type="submit" class="btn btn-primary"><i class="fa-solid fa-plus"></i> Add User</button>
             </div>
         </form>
     </div>
 </div>
 
-<!-- MODAL: Edit User -->
+<!-- ══ MODAL: Edit User ══ -->
 <div class="modal-overlay" id="editUserModal">
     <div class="modal">
-        <div class="modal-header"><div class="modal-title">Edit User</div><button class="modal-close" onclick="closeModal('editUserModal')">×</button></div>
+        <div class="modal-header">
+            <div class="modal-title"><i class="fa-solid fa-pen" style="color:#EF6C52;margin-right:8px"></i>Edit User</div>
+            <button class="modal-close" onclick="closeModal('editUserModal')">×</button>
+        </div>
         <form method="POST" action="?tab=users">
             <input type="hidden" name="action" value="edit_user">
             <input type="hidden" name="user_id" id="editUserId">
@@ -781,16 +878,19 @@ $activeAlerts  = count(array_filter($patients, fn($p) => ($p['hr_status'] ?? '')
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-ghost" onclick="closeModal('editUserModal')">Cancel</button>
-                <button type="submit" class="btn btn-primary">Save Changes</button>
+                <button type="submit" class="btn btn-primary"><i class="fa-solid fa-floppy-disk"></i> Save Changes</button>
             </div>
         </form>
     </div>
 </div>
 
-<!-- MODAL: Add Patient -->
+<!-- ══ MODAL: Add Patient ══ -->
 <div class="modal-overlay" id="addPatientModal">
     <div class="modal">
-        <div class="modal-header"><div class="modal-title">Add New Patient</div><button class="modal-close" onclick="closeModal('addPatientModal')">×</button></div>
+        <div class="modal-header">
+            <div class="modal-title"><i class="fa-solid fa-user-plus" style="color:#EF6C52;margin-right:8px"></i>Add New Patient</div>
+            <button class="modal-close" onclick="closeModal('addPatientModal')">×</button>
+        </div>
         <form method="POST" action="?tab=patients">
             <input type="hidden" name="action" value="add_patient">
             <div class="modal-body">
@@ -808,16 +908,19 @@ $activeAlerts  = count(array_filter($patients, fn($p) => ($p['hr_status'] ?? '')
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-ghost" onclick="closeModal('addPatientModal')">Cancel</button>
-                <button type="submit" class="btn btn-primary">Add Patient</button>
+                <button type="submit" class="btn btn-primary"><i class="fa-solid fa-plus"></i> Add Patient</button>
             </div>
         </form>
     </div>
 </div>
 
-<!-- MODAL: Edit Patient -->
+<!-- ══ MODAL: Edit Patient ══ -->
 <div class="modal-overlay" id="editPatientModal">
     <div class="modal">
-        <div class="modal-header"><div class="modal-title">Edit Patient</div><button class="modal-close" onclick="closeModal('editPatientModal')">×</button></div>
+        <div class="modal-header">
+            <div class="modal-title"><i class="fa-solid fa-pen" style="color:#EF6C52;margin-right:8px"></i>Edit Patient</div>
+            <button class="modal-close" onclick="closeModal('editPatientModal')">×</button>
+        </div>
         <form method="POST" action="?tab=patients">
             <input type="hidden" name="action" value="edit_patient">
             <input type="hidden" name="patient_id" id="editPatientId">
@@ -836,16 +939,19 @@ $activeAlerts  = count(array_filter($patients, fn($p) => ($p['hr_status'] ?? '')
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-ghost" onclick="closeModal('editPatientModal')">Cancel</button>
-                <button type="submit" class="btn btn-primary">Save Changes</button>
+                <button type="submit" class="btn btn-primary"><i class="fa-solid fa-floppy-disk"></i> Save Changes</button>
             </div>
         </form>
     </div>
 </div>
 
-<!-- MODAL: Add Device -->
+<!-- ══ MODAL: Add Device ══ -->
 <div class="modal-overlay" id="addDeviceModal">
     <div class="modal">
-        <div class="modal-header"><div class="modal-title">Add New Device</div><button class="modal-close" onclick="closeModal('addDeviceModal')">×</button></div>
+        <div class="modal-header">
+            <div class="modal-title"><i class="fa-solid fa-microchip" style="color:#EF6C52;margin-right:8px"></i>Add New Device</div>
+            <button class="modal-close" onclick="closeModal('addDeviceModal')">×</button>
+        </div>
         <form method="POST" action="?tab=devices">
             <input type="hidden" name="action" value="add_device">
             <div class="modal-body">
@@ -868,21 +974,24 @@ $activeAlerts  = count(array_filter($patients, fn($p) => ($p['hr_status'] ?? '')
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-ghost" onclick="closeModal('addDeviceModal')">Cancel</button>
-                <button type="submit" class="btn btn-primary">Add Device</button>
+                <button type="submit" class="btn btn-primary"><i class="fa-solid fa-plus"></i> Add Device</button>
             </div>
         </form>
     </div>
 </div>
 
-<!-- MODAL: Assign Device -->
+<!-- ══ MODAL: Assign Device ══ -->
 <div class="modal-overlay" id="assignDeviceModal">
     <div class="modal">
-        <div class="modal-header"><div class="modal-title">Assign Device: <span id="assignDeviceName" style="color:#3b82f6"></span></div><button class="modal-close" onclick="closeModal('assignDeviceModal')">×</button></div>
+        <div class="modal-header">
+            <div class="modal-title"><i class="fa-solid fa-link" style="color:#EF6C52;margin-right:8px"></i>Assign Device: <span id="assignDeviceName" style="color:#EF6C52"></span></div>
+            <button class="modal-close" onclick="closeModal('assignDeviceModal')">×</button>
+        </div>
         <form method="POST" action="?tab=devices">
             <input type="hidden" name="action" value="assign_device">
             <input type="hidden" name="device_id" id="assignDeviceId">
             <div class="modal-body">
-                <p style="font-size:13px;color:var(--text-muted);margin-bottom:14px">Assign to a patient or rescuer. Leave the other blank.</p>
+                <p style="font-size:13px;color:#6B7280;margin-bottom:14px">Assign to a patient or rescuer. Leave the other blank.</p>
                 <div class="form-group"><label class="form-label">Assign to Patient</label>
                     <select name="patient_id" class="form-select">
                         <option value="">— No patient —</option>
@@ -898,7 +1007,7 @@ $activeAlerts  = count(array_filter($patients, fn($p) => ($p['hr_status'] ?? '')
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-ghost" onclick="closeModal('assignDeviceModal')">Cancel</button>
-                <button type="submit" class="btn btn-primary">Confirm</button>
+                <button type="submit" class="btn btn-primary"><i class="fa-solid fa-check"></i> Confirm</button>
             </div>
         </form>
     </div>
@@ -906,24 +1015,22 @@ $activeAlerts  = count(array_filter($patients, fn($p) => ($p['hr_status'] ?? '')
 
 <!-- ══ MODAL: Patient Incident Reports ══ -->
 <div class="modal-overlay" id="patientReportsModal">
-    <div class="modal">
+    <div class="modal" style="max-width:680px;width:95vw">
         <div class="modal-header">
             <div>
-                <div class="modal-title">📋 Incident Reports</div>
-                <div id="prModalSub" style="font-size:12px;color:var(--text-muted);margin-top:2px"></div>
+                <div class="modal-title"><i class="fa-solid fa-clipboard-list" style="color:#EF6C52;margin-right:8px"></i>Incident Reports</div>
+                <div id="prModalSub" style="font-size:12px;color:#9CA3AF;margin-top:2px"></div>
             </div>
             <button class="modal-close" onclick="closeModal('patientReportsModal')">×</button>
         </div>
-        <div class="modal-body">
-            <!-- Patient info strip -->
+        <div class="modal-body" style="max-height:65vh;overflow-y:auto">
             <div class="patient-report-info">
-                <div style="width:40px;height:40px;border-radius:50%;background:rgba(99,102,241,.15);border:1px solid rgba(99,102,241,.3);display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0">👤</div>
+                <div style="width:40px;height:40px;border-radius:50%;background:rgba(239,108,82,.1);border:1px solid rgba(239,108,82,.25);display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0">👤</div>
                 <div>
                     <div class="pri-name" id="prPatientName">—</div>
                     <div class="pri-sub" id="prPatientMeta">—</div>
                 </div>
             </div>
-            <!-- Reports list -->
             <div id="prReportsList"></div>
         </div>
         <div class="modal-footer">
@@ -932,123 +1039,124 @@ $activeAlerts  = count(array_filter($patients, fn($p) => ($p['hr_status'] ?? '')
     </div>
 </div>
 
-<!-- Embed all reports as JS data -->
-<script>
-const ALL_REPORTS = <?= json_encode($reportsByPatient) ?>;
-</script>
-
+<script>const ALL_REPORTS = <?= json_encode($reportsByPatient) ?>;</script>
 <div id="toastContainer" class="toast-container"></div>
 <script src="../assets/js/scripts.js"></script>
 <script>
-(function tick(){ const el=document.getElementById('liveClock'); if(el) el.textContent=new Date().toLocaleTimeString(); setTimeout(tick,1000); })();
+(function tick(){ const el=document.getElementById('liveClock');if(el)el.textContent=new Date().toLocaleTimeString();setTimeout(tick,1000);})();
 
-function openEditUser(u) {
-    document.getElementById('editUserId').value   = u.id;
-    document.getElementById('editFullName').value = u.full_name;
-    document.getElementById('editEmail').value    = u.email || '';
-    document.getElementById('editRole').value     = u.role;
-    document.getElementById('editStatus').value   = u.status || 'active';
+function openModal(id){ const el=document.getElementById(id);if(!el)return;el.classList.add('open','active');el.style.display='flex'; }
+function closeModal(id){ const el=document.getElementById(id);if(!el)return;el.classList.remove('open','active');el.style.display=''; }
+document.querySelectorAll('.modal-overlay').forEach(m=>m.addEventListener('click',e=>{if(e.target===m)closeModal(m.id);}));
+
+function toggleSidebar(){
+    const sb=document.getElementById('sidebar');
+    const ov=document.getElementById('sidebarOverlay');
+    if(!sb)return;
+    const open=sb.classList.toggle('open');
+    if(ov)ov.classList.toggle('open',open);
+    document.body.style.overflow=open?'hidden':'';
+}
+
+function openEditUser(u){
+    document.getElementById('editUserId').value=u.id;
+    document.getElementById('editFullName').value=u.full_name;
+    document.getElementById('editEmail').value=u.email||'';
+    document.getElementById('editRole').value=u.role;
+    document.getElementById('editStatus').value=u.status||'active';
     openModal('editUserModal');
 }
-function openEditPatient(p) {
-    document.getElementById('editPatientId').value        = p.id;
-    document.getElementById('editPatientName').value      = p.name;
-    document.getElementById('editPatientAge').value       = p.age;
-    document.getElementById('editPatientCondition').value = p.medical_condition || '';
-    document.getElementById('editPatientRescuer').value   = p.assigned_to || '';
+function openEditPatient(p){
+    document.getElementById('editPatientId').value=p.id;
+    document.getElementById('editPatientName').value=p.name;
+    document.getElementById('editPatientAge').value=p.age;
+    document.getElementById('editPatientCondition').value=p.medical_condition||'';
+    document.getElementById('editPatientRescuer').value=p.assigned_to||'';
     openModal('editPatientModal');
 }
-function openAssignModal(deviceId, deviceLabel) {
-    document.getElementById('assignDeviceId').value         = deviceId;
-    document.getElementById('assignDeviceName').textContent = deviceLabel;
+function openAssignModal(deviceId,deviceLabel){
+    document.getElementById('assignDeviceId').value=deviceId;
+    document.getElementById('assignDeviceName').textContent=deviceLabel;
     openModal('assignDeviceModal');
 }
 
-// ── Patient Reports Modal ────────────────────────────────────────────────────
-function openPatientReports(patientId, patientName, patientAge, patientCondition) {
-    document.getElementById('prPatientName').textContent = patientName;
-    document.getElementById('prPatientMeta').textContent =
-        'Age: ' + patientAge + '  •  Condition: ' + (patientCondition || '—');
-
-    const reports = ALL_REPORTS[patientId] || [];
-    const sub     = document.getElementById('prModalSub');
-    sub.textContent = reports.length + ' report' + (reports.length !== 1 ? 's' : '') + ' submitted by rescuer';
-
-    const list = document.getElementById('prReportsList');
-
-    if (reports.length === 0) {
-        list.innerHTML = '<div class="report-empty">📭 No incident reports found for this patient.</div>';
+function openPatientReports(patientId,patientName,patientAge,patientCondition){
+    document.getElementById('prPatientName').textContent=patientName;
+    document.getElementById('prPatientMeta').textContent='Age: '+patientAge+' · Condition: '+(patientCondition||'—');
+    const reports=ALL_REPORTS[patientId]||[];
+    document.getElementById('prModalSub').textContent=reports.length+' report'+(reports.length!==1?'s':'')+' on file';
+    const list=document.getElementById('prReportsList');
+    const sevClass={low:'sev-low',medium:'sev-medium',high:'sev-high',critical:'sev-critical'};
+    if(reports.length===0){
+        list.innerHTML='<div class="report-empty">📭 No incident reports found for this patient.</div>';
     } else {
-        const sevClass = { low:'sev-low', medium:'sev-medium', high:'sev-high', critical:'sev-critical' };
-        list.innerHTML = reports.map(function(r) {
-            const dt = new Date(r.created_at);
-            const dateStr = dt.toLocaleDateString('en-US', { month:'short', day:'numeric', year:'numeric' });
-            const timeStr = dt.toLocaleTimeString('en-US', { hour:'2-digit', minute:'2-digit' });
-            const sc = sevClass[r.severity] || 'sev-medium';
+        list.innerHTML=reports.map(function(r){
+            const dt=new Date(r.created_at);
+            const dStr=dt.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
+            const tStr=dt.toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit'});
+            const sc=sevClass[r.severity]||'sev-medium';
             return '<div class="report-card">'
-                + '<div class="report-card-header">'
-                +   '<div class="report-card-title">' + escHtml(r.incident_type) + '</div>'
-                +   '<span class="sev-badge ' + sc + '">' + capFirst(r.severity) + '</span>'
-                + '</div>'
-                + '<div class="report-card-meta">'
-                +   '<span>👤 ' + escHtml(r.rescuer_name) + ' <span style="opacity:.6;font-size:11px">(' + capFirst(r.rescuer_role) + ')</span></span>'
-                +   '<span>📅 ' + dateStr + ' at ' + timeStr + '</span>'
-                + '</div>'
-                + (r.description
-                    ? '<div class="report-card-desc">' + escHtml(r.description) + '</div>'
-                    : '<div style="font-size:12px;color:var(--text-muted);font-style:italic">No additional description provided.</div>')
-                + '</div>';
+                +'<div class="report-card-header">'
+                +'<div class="report-card-title">'+escHtml(r.incident_type)+'</div>'
+                +'<span class="sev-badge '+sc+'">'+capFirst(r.severity)+'</span>'
+                +'</div>'
+                +'<div class="report-card-meta">'
+                +'<span>👤 '+escHtml(r.rescuer_name)+'</span>'
+                +'<span>📅 '+dStr+' at '+tStr+'</span>'
+                +'</div>'
+                +(r.description?'<div class="report-card-desc">'+escHtml(r.description)+'</div>':'<div style="font-size:12px;color:#9CA3AF;font-style:italic">No additional description provided.</div>')
+                +'</div>';
         }).join('');
     }
-
     openModal('patientReportsModal');
 }
+function escHtml(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+function capFirst(s){return s?s.charAt(0).toUpperCase()+s.slice(1):'';}
 
-function escHtml(str) {
-    return String(str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-}
-function capFirst(s) {
-    return s ? s.charAt(0).toUpperCase() + s.slice(1) : '';
-}
-
-Chart.defaults.color       = '#94a3b8';
-Chart.defaults.borderColor = '#1e293b';
+Chart.defaults.color='#94a3b8';
+Chart.defaults.borderColor='rgba(30,36,80,.06)';
+Chart.defaults.font.family="'DM Sans', sans-serif";
 
 <?php if ($tab === 'analytics' && count($hourlyData) > 0): ?>
-new Chart(document.getElementById('hourlyChart'), {
-    type: 'line',
-    data: {
-        labels: <?= json_encode(array_column($hourlyData,'hour_label')) ?>,
-        datasets: [{
-            label:'Avg Heart Rate', data:<?= json_encode(array_column($hourlyData,'avg_bpm')) ?>,
-            borderColor:'#3b82f6', backgroundColor:'rgba(59,130,246,0.08)',
-            borderWidth:2, tension:0.4, fill:true, pointRadius:3,
+new Chart(document.getElementById('hourlyChart'),{
+    type:'line',
+    data:{
+        labels:<?= json_encode(array_column($hourlyData,'hour_label')) ?>,
+        datasets:[{
+            label:'Avg Heart Rate',data:<?= json_encode(array_column($hourlyData,'avg_bpm')) ?>,
+            borderColor:'#EF6C52',backgroundColor:'rgba(239,108,82,0.08)',
+            borderWidth:2.5,tension:0.4,fill:true,pointRadius:4,
+            pointBackgroundColor:'#EF6C52',pointBorderColor:'#fff',pointBorderWidth:2,
         },{
-            label:'Critical Count', data:<?= json_encode(array_column($hourlyData,'critical_count')) ?>,
-            borderColor:'#ef4444', backgroundColor:'rgba(239,68,68,0.08)',
-            borderWidth:2, tension:0.4, fill:true, yAxisID:'y2', pointRadius:3,
+            label:'Critical Count',data:<?= json_encode(array_column($hourlyData,'critical_count')) ?>,
+            borderColor:'#ef4444',backgroundColor:'rgba(239,68,68,0.07)',
+            borderWidth:2,tension:0.4,fill:true,yAxisID:'y2',pointRadius:3,
         }]
     },
     options:{
-        responsive:true, maintainAspectRatio:false,
-        plugins:{ legend:{ position:'top' } },
+        responsive:true,maintainAspectRatio:false,
+        plugins:{legend:{position:'top',labels:{usePointStyle:true,padding:16}}},
         scales:{
-            x:  { grid:{ color:'#1e293b' } },
-            y:  { grid:{ color:'#1e293b' }, title:{ display:true, text:'BPM' } },
-            y2: { position:'right', grid:{ display:false }, title:{ display:true, text:'Critical' } }
+            x:{grid:{color:'rgba(30,36,80,.05)'}},
+            y:{grid:{color:'rgba(30,36,80,.05)'},title:{display:true,text:'BPM',color:'#9CA3AF'}},
+            y2:{position:'right',grid:{display:false},title:{display:true,text:'Critical',color:'#9CA3AF'}}
         }
     }
 });
 <?php endif; ?>
 
 <?php if ($tab === 'analytics' && ($normalCnt + $warnCnt + $critCnt) > 0): ?>
-new Chart(document.getElementById('alertPieChart'), {
-    type: 'doughnut',
-    data: {
-        labels: ['Normal','Warning','Critical'],
-        datasets: [{ data:[<?= (int)$normalCnt ?>,<?= (int)$warnCnt ?>,<?= (int)$critCnt ?>], backgroundColor:['#10b981','#f59e0b','#ef4444'], borderWidth:0, hoverOffset:6 }]
+new Chart(document.getElementById('alertPieChart'),{
+    type:'doughnut',
+    data:{
+        labels:['Normal','Warning','Critical'],
+        datasets:[{
+            data:[<?= (int)$normalCnt ?>,<?= (int)$warnCnt ?>,<?= (int)$critCnt ?>],
+            backgroundColor:['#EF6C52','#f59e0b','#ef4444'],
+            borderWidth:0,hoverOffset:8
+        }]
     },
-    options:{ responsive:false, plugins:{ legend:{ position:'bottom' } }, cutout:'65%' }
+    options:{responsive:false,plugins:{legend:{position:'bottom',labels:{usePointStyle:true,padding:14}}},cutout:'65%'}
 });
 <?php endif; ?>
 </script>
