@@ -32,19 +32,18 @@ $user = getCurrentUser();
     --sb-label     : #4D3830;
 
     /* Main content */
-    --bg-page      : #F8F4F2;          /* warm blush pink — more visible */
+    --bg-page      : #F8F4F2;
     --bg-card      : #FFFFFF;
     --text-primary : #1E2450;
     --text-secondary: #374151;
     --text-muted   : #6B7280;
     --text-label   : #9CA3AF;
 
-    /* Card borders & shadows — bolder */
+    /* Card borders & shadows */
     --card-border  : rgba(239,108,82,.30);
     --card-shadow  : 0 4px 20px rgba(239,108,82,.18), 0 1px 6px rgba(30,36,80,.10);
     --card-shadow-hover: 0 12px 40px rgba(239,108,82,.28), 0 4px 12px rgba(30,36,80,.14);
 
-    /* Dark theme overrides */
     --bg-surface   : #0f172a;
     --bg-input     : #0f172a;
     --border       : #334155;
@@ -71,7 +70,8 @@ body {
 
 /* ── Layout ── */
 .layout        { display: flex; min-height: 100vh; }
-.main-content  { flex: 1; min-width: 0; overflow-x: hidden; }
+/* FIX: overflow-x: clip instead of hidden so position:sticky works on children */
+.main-content  { flex: 1; min-width: 0; overflow-x: clip; }
 
 /* ═══════════════════════════════════════════════════
    SIDEBAR
@@ -317,30 +317,53 @@ body {
 .chart-wrapper   { position: relative; }
 
 /* ═══════════════════════════════════════════════════
-   TABS
+   TABS  — FIX: proper scrolling + all tabs visible
 ═══════════════════════════════════════════════════ */
 .tabs {
-    display: flex; overflow-x: auto; -webkit-overflow-scrolling: touch;
-    scrollbar-width: none; gap: 2px;
-    padding: 16px 20px 0;
+    display: flex;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+    gap: 2px;
+    padding: 12px 12px 0;
     border-bottom: 2px solid rgba(239,108,82,.18);
+    /* prevent tab bar from shrinking its children */
+    flex-wrap: nowrap;
 }
 .tabs::-webkit-scrollbar { display: none; }
+
 .tab-btn {
-    white-space: nowrap; flex-shrink: 0;
-    color: var(--text-muted); font-weight: 600; font-size: 13px;
-    border: none; background: none; cursor: pointer;
-    padding: 10px 18px 12px;
+    white-space: nowrap;
+    flex-shrink: 0;          /* IMPORTANT: never shrink — force scroll instead */
+    color: var(--text-muted);
+    font-weight: 600;
+    font-size: 13px;
+    border: none;
+    background: none;
+    cursor: pointer;
+    padding: 10px 16px 12px;
     border-bottom: 2px solid transparent;
     margin-bottom: -2px;
     transition: all .2s;
     font-family: 'DM Sans', sans-serif;
     border-radius: 8px 8px 0 0;
+    display: flex;
+    align-items: center;
+    gap: 5px;
 }
 .tab-btn:hover  { color: var(--c-coral); background: var(--c-coral-muted); }
 .tab-btn.active {
-    color: var(--c-coral); border-bottom-color: var(--c-coral);
-    font-weight: 700; background: rgba(239,108,82,.06);
+    color: var(--c-coral);
+    border-bottom-color: var(--c-coral);
+    font-weight: 700;
+    background: rgba(239,108,82,.06);
+}
+
+/* On very small screens: tighten padding, hide icons to save room */
+@media (max-width: 480px) {
+    .tab-btn { padding: 10px 11px 12px; font-size: 12px; }
+    .tab-btn i { display: none; }
 }
 
 /* ═══════════════════════════════════════════════════
@@ -440,7 +463,7 @@ table tbody td { padding: 14px 18px; font-size: 13px; color: var(--text-primary)
 .device-mini-card .dmc-sub   { font-size: 11px; color: var(--text-label); margin-top: 2px; }
 
 .status-select {
-    background: #F9FAFB !important; border: 1px solid #E5E7EB !important;
+    background: #F9FAFB !important; border: 1.5px solid #D1D5DB !important;
     color: var(--text-primary) !important; border-radius: 8px !important;
     padding: 5px 10px !important; font-size: 12px !important; font-weight: 600;
     cursor: pointer; font-family: 'DM Sans', sans-serif;
@@ -454,57 +477,80 @@ table tbody td { padding: 14px 18px; font-size: 13px; color: var(--text-primary)
 .action-btn-yellow:hover { background:rgba(245,158,11,.2); }
 
 /* ═══════════════════════════════════════════════════
-   MODALS
+   MODALS — FIX: strong visible borders & dividers
 ═══════════════════════════════════════════════════ */
 .modal-overlay {
     display: none; position: fixed; inset: 0;
-    background: rgba(0,0,0,.5); backdrop-filter: blur(4px);
+    background: rgba(0,0,0,.55); backdrop-filter: blur(4px);
     z-index: 1000; align-items: center; justify-content: center;
 }
 .modal-overlay.open, .modal-overlay.active { display: flex; }
 .modal {
-    background: #fff; border-radius: 16px; width: 100%; max-width: 480px;
-    box-shadow: 0 24px 64px rgba(0,0,0,.18), 0 4px 16px rgba(239,108,82,.1);
-    border: 1.5px solid rgba(239,108,82,.20);
+    background: #fff;
+    border-radius: 16px;
+    width: 100%; max-width: 480px;
+    /* FIX: much stronger border so the modal outline is clearly visible */
+    box-shadow: 0 24px 64px rgba(0,0,0,.22), 0 4px 16px rgba(239,108,82,.18), 0 0 0 1.5px rgba(239,108,82,.50);
+    border: 2px solid rgba(239,108,82,.45);
     max-height: 90vh; display: flex; flex-direction: column;
 }
 .modal-header {
     display: flex; align-items: center; justify-content: space-between;
-    padding: 22px 26px 18px; border-bottom: 1px solid rgba(239,108,82,.10); flex-shrink: 0;
+    padding: 22px 26px 18px;
+    /* FIX: stronger header divider */
+    border-bottom: 1.5px solid rgba(239,108,82,.28);
+    flex-shrink: 0;
 }
 .modal-title { font-size: 16px; font-weight: 800; color: var(--text-primary); margin: 0; }
-.modal-close { background: none; border: none; font-size: 22px; color: var(--text-muted); cursor: pointer; padding: 0 4px; line-height: 1; transition: color .2s; }
-.modal-close:hover { color: #ef4444; }
+.modal-close {
+    background: rgba(239,108,82,.08); border: 1px solid rgba(239,108,82,.20);
+    font-size: 20px; color: var(--text-muted); cursor: pointer;
+    padding: 2px 8px; line-height: 1; border-radius: 6px;
+    transition: all .2s;
+}
+.modal-close:hover { background: rgba(239,68,68,.12); color: #ef4444; border-color: rgba(239,68,68,.30); }
 .modal-body { padding: 22px 26px; overflow-y: auto; flex: 1; }
 .modal-footer {
-    padding: 16px 26px; border-top: 1px solid rgba(239,108,82,.10);
+    padding: 16px 26px;
+    /* FIX: stronger footer divider */
+    border-top: 1.5px solid rgba(239,108,82,.22);
     display: flex; gap: 10px; justify-content: flex-end; flex-shrink: 0;
+    background: rgba(239,108,82,.03);
 }
 
-/* Form elements */
+/* ── Form elements — FIX: stronger visible borders ── */
 .form-group  { margin-bottom: 16px; }
-.form-label  { display: block; font-size: 12px; font-weight: 700; color: var(--text-muted); margin-bottom: 6px; text-transform: uppercase; letter-spacing: .5px; }
+.form-label  {
+    display: block; font-size: 11px; font-weight: 700;
+    color: var(--text-muted); margin-bottom: 6px;
+    text-transform: uppercase; letter-spacing: .6px;
+}
 .form-input, .form-select {
     width: 100%; padding: 10px 14px;
-    background: #F9FAFB; border: 1.5px solid #E5E7EB;
+    background: #F9FAFB;
+    /* FIX: darker border so fields are clearly defined */
+    border: 1.5px solid #C9CDD4;
     border-radius: 9px; color: var(--text-primary); font-size: 13px;
     font-family: 'DM Sans', sans-serif; transition: all .2s;
+    box-shadow: inset 0 1px 3px rgba(0,0,0,.05);
 }
 .form-input:focus, .form-select:focus {
     outline: none; border-color: var(--c-coral);
-    background: #fff; box-shadow: 0 0 0 3px var(--c-coral-muted);
+    background: #fff;
+    box-shadow: 0 0 0 3px rgba(239,108,82,.15), inset 0 1px 3px rgba(0,0,0,.03);
 }
+.form-input::placeholder { color: #B0B7C3; }
 .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
 
 /* Report cards */
-.report-card { background:#F9FAFB;border:1px solid rgba(239,108,82,.14);border-radius:11px;padding:16px 18px;margin-bottom:12px;box-shadow:0 1px 6px rgba(0,0,0,.05); }
+.report-card { background:#F9FAFB;border:1.5px solid rgba(239,108,82,.20);border-radius:11px;padding:16px 18px;margin-bottom:12px;box-shadow:0 1px 6px rgba(0,0,0,.05); }
 .report-card:last-child { margin-bottom:0; }
 .report-card-header { display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px;gap:10px; }
 .report-card-title  { font-size:14px;font-weight:700;color:var(--text-primary);flex:1; }
 .report-card-meta   { font-size:12px;color:var(--text-muted);margin-bottom:6px;display:flex;gap:14px;flex-wrap:wrap; }
 .report-card-desc   { font-size:13px;color:var(--text-secondary);line-height:1.6;white-space:pre-wrap; }
 .report-empty       { text-align:center;padding:50px 20px;color:var(--text-muted);font-size:14px; }
-.patient-report-info { display:flex;gap:12px;align-items:center;padding:12px 16px;background:rgba(239,108,82,.05);border-radius:10px;margin-bottom:16px;border:1px solid rgba(239,108,82,.14); }
+.patient-report-info { display:flex;gap:12px;align-items:center;padding:12px 16px;background:rgba(239,108,82,.05);border-radius:10px;margin-bottom:16px;border:1.5px solid rgba(239,108,82,.20); }
 .pri-name { font-size:16px;font-weight:800;color:var(--text-primary); }
 .pri-sub  { font-size:12px;color:var(--text-muted);margin-top:2px; }
 .report-count-badge { display:inline-flex;align-items:center;justify-content:center;background:var(--c-coral-muted);color:var(--c-coral);border:1px solid var(--c-coral-border);border-radius:20px;font-size:11px;font-weight:700;padding:2px 8px;margin-left:6px; }
@@ -515,9 +561,6 @@ table tbody td { padding: 14px 18px; font-size: 13px; color: var(--text-primary)
 /* Sidebar overlay */
 .sidebar-overlay { display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9997; }
 .sidebar-overlay.open { display:block; }
-
-/* ── Mobile bottom nav: FULLY REMOVED ── */
-/* No .mobile-bottom-nav styles — element is not rendered in HTML */
 
 /* ═══════════════════════════════════════════════════
    RESPONSIVE
@@ -538,9 +581,10 @@ table tbody td { padding: 14px 18px; font-size: 13px; color: var(--text-primary)
     }
     .sidebar.open { transform: translateX(0); }
     .sidebar-close { display: flex !important; }
-    /* No bottom nav padding needed since it's removed */
     .page-content { padding: 16px; }
     .topbar { padding: 0 16px; }
+    /* Modal full-width on mobile */
+    .modal { max-width: calc(100vw - 24px); margin: 0 12px; }
 }
 @media (max-width: 600px) {
     .stats-grid-4, .stats-grid-3 { grid-template-columns: repeat(2,1fr); }
@@ -559,7 +603,7 @@ table tbody td { padding: 14px 18px; font-size: 13px; color: var(--text-primary)
     <div class="sidebar-header">
         <div class="sidebar-logo">
             <div class="logo-icon">
-                <img src="/VitalWearV2/assets/css/image.png" alt="VitalWear Logo" width="36" height="36">
+              <img src="<?= BASE_URL ?>/assets/image.png" alt="VitalWear Logo" width="36" height="36">
             </div>
             <span class="logo-text">VitalWear</span>
         </div>
@@ -626,4 +670,3 @@ table tbody td { padding: 14px 18px; font-size: 13px; color: var(--text-primary)
     </nav>
 </aside>
 
-<!-- Mobile bottom nav intentionally removed -->

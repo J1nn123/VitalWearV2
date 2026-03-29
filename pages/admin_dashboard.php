@@ -250,10 +250,10 @@ $activeAlerts  = count(array_filter($patients, fn($p) => ($p['hr_status'] ?? '')
             .menu-toggle { display: none !important; }
         }
 
-        /* ── Mini info cards (role distribution / device summary on overview) ── */
+        /* ── Mini info cards ── */
         .mini-info-card {
             background: #fff;
-            border: 1.5px solid rgba(239,108,82,.30);
+            border: 2px solid rgba(239,108,82,.40);
             border-radius: 12px;
             padding: 20px;
             text-align: center;
@@ -283,14 +283,17 @@ $activeAlerts  = count(array_filter($patients, fn($p) => ($p['hr_status'] ?? '')
 
         /* ── Device mini-cards ── */
         .device-stats-grid {
-            display: grid; grid-template-columns: repeat(4,1fr); gap: 16px; margin-bottom: 22px;
+            display: grid;
+            grid-template-columns: repeat(4,1fr);
+            gap: 16px;
+            margin-bottom: 22px;
         }
         @media(max-width:700px){ .device-stats-grid{ grid-template-columns:repeat(2,1fr); } }
 
         /* ── Status select ── */
         .status-select {
             background: #F9FAFB !important;
-            border: 1px solid #E5E7EB !important;
+            border: 1.5px solid #C4C9D4 !important;
             color: #1E2450 !important;
             border-radius: 8px !important;
             padding: 5px 10px !important;
@@ -311,14 +314,10 @@ $activeAlerts  = count(array_filter($patients, fn($p) => ($p['hr_status'] ?? '')
             font-weight: 600; cursor: pointer; border: 1px solid transparent;
             margin-left: 4px; transition: all .18s; font-family: 'DM Sans', sans-serif;
         }
-        .action-btn-blue   { background: rgba(239,108,82,.12); color: #EF6C52; border-color: rgba(239,108,82,.30); }
+        .action-btn-blue   { background: rgba(239,108,82,.12); color: #EF6C52; border-color: rgba(239,108,82,.40); }
         .action-btn-blue:hover { background: rgba(239,108,82,.22); }
-        .action-btn-yellow { background: rgba(245,158,11,.1); color: #d97706; border-color: rgba(245,158,11,.30); }
+        .action-btn-yellow { background: rgba(245,158,11,.1); color: #d97706; border-color: rgba(245,158,11,.40); }
         .action-btn-yellow:hover { background: rgba(245,158,11,.2); }
-
-        /* ── Report cards ── */
-        #patientReportsModal .modal { max-width: 680px; width: 95vw; }
-        #patientReportsModal .modal-body { max-height: 65vh; overflow-y: auto; }
 
         /* ── Log action pill ── */
         .log-action-pill {
@@ -326,7 +325,7 @@ $activeAlerts  = count(array_filter($patients, fn($p) => ($p['hr_status'] ?? '')
             background: rgba(59,130,246,.08);
             color: #3b82f6;
             padding: 2px 8px; border-radius: 5px;
-            border: 1px solid rgba(59,130,246,.18);
+            border: 1px solid rgba(59,130,246,.30);
         }
 
         /* ── Analytics grid ── */
@@ -334,6 +333,180 @@ $activeAlerts  = count(array_filter($patients, fn($p) => ($p['hr_status'] ?? '')
             display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px;
         }
         @media(max-width:900px){ .analytics-charts-grid{ grid-template-columns:1fr; } }
+
+        /* ══════════════════════════════════════════
+           STICKY TAB BAR WRAPPER
+        ══════════════════════════════════════════ */
+        .tab-sticky-wrapper {
+            position: sticky;
+            top: 60px;
+            z-index: 900;
+            background: #fff;
+            border-radius: 14px;
+            border: 2px solid rgba(239,108,82,.35);
+            box-shadow: 0 4px 20px rgba(239,108,82,.18);
+            margin-bottom: 24px;
+            /* No overflow:hidden here — lets inner scroll work */
+        }
+
+        /* ══════════════════════════════════════════
+           TABS — scrollable, all items visible
+        ══════════════════════════════════════════ */
+        .tabs {
+            display: flex;
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+            gap: 2px;
+            padding: 12px 12px 0;
+            border-bottom: 2px solid rgba(239,108,82,.25);
+            border-radius: 14px 14px 0 0;
+        }
+        .tabs::-webkit-scrollbar { display: none; }
+
+        .tab-btn {
+            white-space: nowrap;
+            flex-shrink: 0;
+            color: #6B7280;
+            font-weight: 600;
+            font-size: 13px;
+            border: none;
+            background: none;
+            cursor: pointer;
+            padding: 10px 16px 12px;
+            border-bottom: 2px solid transparent;
+            margin-bottom: -2px;
+            transition: all .2s;
+            font-family: 'DM Sans', sans-serif;
+            border-radius: 8px 8px 0 0;
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+        }
+        .tab-btn:hover  { color: #EF6C52; background: rgba(239,108,82,.08); }
+        .tab-btn.active {
+            color: #EF6C52;
+            border-bottom-color: #EF6C52;
+            font-weight: 700;
+            background: rgba(239,108,82,.06);
+        }
+        @media (max-width: 520px) {
+            .tab-btn { padding: 10px 12px 12px; font-size: 12px; }
+            .tab-btn i { display: none; }
+        }
+
+        /* ══════════════════════════════════════════
+           MODALS — stronger borders & shadows
+        ══════════════════════════════════════════ */
+        .modal-overlay {
+            display: none;
+            position: fixed; inset: 0;
+            background: rgba(0,0,0,.55);
+            backdrop-filter: blur(5px);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+        }
+        .modal-overlay.open, .modal-overlay.active { display: flex; }
+
+        .modal {
+            background: #fff;
+            border-radius: 16px;
+            width: 100%;
+            max-width: 480px;
+            box-shadow:
+                0 24px 64px rgba(0,0,0,.22),
+                0 6px 24px rgba(239,108,82,.30),
+                0 0 0 1px rgba(239,108,82,.10);
+            border: 2px solid rgba(239,108,82,.55);
+            max-height: 90vh;
+            display: flex;
+            flex-direction: column;
+        }
+        .modal-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 22px 26px 18px;
+            border-bottom: 1.5px solid rgba(239,108,82,.30);
+            flex-shrink: 0;
+        }
+        .modal-title { font-size: 16px; font-weight: 800; color: #1E2450; margin: 0; }
+        .modal-close {
+            background: none; border: none; font-size: 22px;
+            color: #9CA3AF; cursor: pointer; padding: 0 4px;
+            line-height: 1; transition: color .2s;
+        }
+        .modal-close:hover { color: #ef4444; }
+        .modal-body { padding: 22px 26px; overflow-y: auto; flex: 1; }
+        .modal-footer {
+            padding: 16px 26px;
+            border-top: 1.5px solid rgba(239,108,82,.30);
+            display: flex; gap: 10px; justify-content: flex-end; flex-shrink: 0;
+        }
+
+        /* ── Form elements — stronger borders ── */
+        .form-group  { margin-bottom: 16px; }
+        .form-label  {
+            display: block; font-size: 12px; font-weight: 700;
+            color: #6B7280; margin-bottom: 6px;
+            text-transform: uppercase; letter-spacing: .5px;
+        }
+        .form-input, .form-select {
+            width: 100%; padding: 10px 14px;
+            background: #F9FAFB;
+            border: 1.5px solid #C4C9D4;
+            border-radius: 9px; color: #1E2450; font-size: 13px;
+            font-family: 'DM Sans', sans-serif; transition: all .2s;
+        }
+        .form-input:focus, .form-select:focus {
+            outline: none;
+            border-color: #EF6C52;
+            background: #fff;
+            box-shadow: 0 0 0 3px rgba(239,108,82,.14);
+        }
+        .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+        @media(max-width:520px){ .form-grid { grid-template-columns: 1fr; } }
+
+        /* ── Report cards ── */
+        .report-card {
+            background:#F9FAFB;
+            border: 1.5px solid rgba(239,108,82,.25);
+            border-radius:11px; padding:16px 18px; margin-bottom:12px;
+            box-shadow:0 2px 8px rgba(0,0,0,.06);
+        }
+        .report-card:last-child { margin-bottom:0; }
+        .report-card-header { display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px;gap:10px; }
+        .report-card-title  { font-size:14px;font-weight:700;color:#1E2450;flex:1; }
+        .report-card-meta   { font-size:12px;color:#6B7280;margin-bottom:6px;display:flex;gap:14px;flex-wrap:wrap; }
+        .report-card-desc   { font-size:13px;color:#374151;line-height:1.6;white-space:pre-wrap; }
+        .report-empty       { text-align:center;padding:50px 20px;color:#9CA3AF;font-size:14px; }
+        .patient-report-info {
+            display:flex;gap:12px;align-items:center;padding:12px 16px;
+            background:rgba(239,108,82,.06);border-radius:10px;margin-bottom:16px;
+            border:1.5px solid rgba(239,108,82,.25);
+        }
+        .pri-name { font-size:16px;font-weight:800;color:#1E2450; }
+        .pri-sub  { font-size:12px;color:#6B7280;margin-top:2px; }
+        .report-count-badge {
+            display:inline-flex;align-items:center;justify-content:center;
+            background:rgba(239,108,82,.12);color:#EF6C52;
+            border:1px solid rgba(239,108,82,.35);border-radius:20px;
+            font-size:11px;font-weight:700;padding:2px 8px;margin-left:6px;
+        }
+        .sev-badge    { padding:2px 10px;border-radius:20px;font-size:11px;font-weight:700;text-transform:uppercase;white-space:nowrap; }
+        .sev-low      { background:rgba(239,108,82,.12);color:#EF6C52;border:1px solid rgba(239,108,82,.35); }
+        .sev-medium   { background:rgba(245,158,11,.12);color:#d97706;border:1px solid rgba(245,158,11,.35); }
+        .sev-high     { background:rgba(239,68,68,.12);color:#ef4444;border:1px solid rgba(239,68,68,.35); }
+        .sev-critical { background:rgba(185,28,28,.1);color:#b91c1c;border:1px solid rgba(185,28,28,.35); }
+
+        /* Toast */
+        .toast-container { position:fixed;bottom:24px;right:24px;z-index:99999;display:flex;flex-direction:column;gap:10px; }
+
+        /* Sidebar overlay */
+        .sidebar-overlay { display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9997; }
+        .sidebar-overlay.open { display:block; }
     </style>
 </head>
 <body>
@@ -360,31 +533,31 @@ $activeAlerts  = count(array_filter($patients, fn($p) => ($p['hr_status'] ?? '')
         <div class="page-content">
 
             <?php if ($msg): ?>
-            <div style="background:<?= $msgType==='success'?'rgba(16,185,129,.1)':'rgba(239,68,68,.1)' ?>;border:1px solid <?= $msgType==='success'?'rgba(16,185,129,.3)':'rgba(239,68,68,.3)' ?>;color:<?= $msgType==='success'?'#10b981':'#ef4444' ?>;border-radius:10px;padding:12px 16px;font-size:13px;margin-bottom:20px;font-weight:600;">
+            <div style="background:<?= $msgType==='success'?'rgba(16,185,129,.1)':'rgba(239,68,68,.1)' ?>;border:1.5px solid <?= $msgType==='success'?'rgba(16,185,129,.4)':'rgba(239,68,68,.4)' ?>;color:<?= $msgType==='success'?'#10b981':'#ef4444' ?>;border-radius:10px;padding:12px 16px;font-size:13px;margin-bottom:20px;font-weight:600;">
                 <?= $msgType==='success'?'✓':'⚠️' ?> <?= htmlspecialchars($msg) ?>
             </div>
             <?php endif; ?>
 
-            <!-- TABS -->
-            <div class="section-card" style="margin-bottom:24px">
+            <!-- ══ STICKY TAB BAR ══ -->
+            <div class="tab-sticky-wrapper">
                 <div class="tabs">
-                    <button class="tab-btn <?= $tab==='overview' ?'active':'' ?>" onclick="location.href='?tab=overview'">
-                        <i class="fa-solid fa-chart-pie" style="margin-right:5px;font-size:11px"></i>Overview
+                    <button class="tab-btn <?= $tab==='overview'   ?'active':'' ?>" onclick="location.href='?tab=overview'">
+                        <i class="fa-solid fa-chart-pie" style="font-size:11px"></i>Overview
                     </button>
-                    <button class="tab-btn <?= $tab==='users' ?'active':'' ?>" onclick="location.href='?tab=users'">
-                        <i class="fa-solid fa-users" style="margin-right:5px;font-size:11px"></i>Users
+                    <button class="tab-btn <?= $tab==='users'      ?'active':'' ?>" onclick="location.href='?tab=users'">
+                        <i class="fa-solid fa-users" style="font-size:11px"></i>Users
                     </button>
-                    <button class="tab-btn <?= $tab==='patients' ?'active':'' ?>" onclick="location.href='?tab=patients'">
-                        <i class="fa-solid fa-user-injured" style="margin-right:5px;font-size:11px"></i>Patients
+                    <button class="tab-btn <?= $tab==='patients'   ?'active':'' ?>" onclick="location.href='?tab=patients'">
+                        <i class="fa-solid fa-user-injured" style="font-size:11px"></i>Patients
                     </button>
-                    <button class="tab-btn <?= $tab==='devices' ?'active':'' ?>" onclick="location.href='?tab=devices'">
-                        <i class="fa-solid fa-microchip" style="margin-right:5px;font-size:11px"></i>Devices
+                    <button class="tab-btn <?= $tab==='devices'    ?'active':'' ?>" onclick="location.href='?tab=devices'">
+                        <i class="fa-solid fa-microchip" style="font-size:11px"></i>Devices
                     </button>
-                    <button class="tab-btn <?= $tab==='analytics' ?'active':'' ?>" onclick="location.href='?tab=analytics'">
-                        <i class="fa-solid fa-chart-line" style="margin-right:5px;font-size:11px"></i>Analytics
+                    <button class="tab-btn <?= $tab==='analytics'  ?'active':'' ?>" onclick="location.href='?tab=analytics'">
+                        <i class="fa-solid fa-chart-line" style="font-size:11px"></i>Analytics
                     </button>
-                    <button class="tab-btn <?= $tab==='logs' ?'active':'' ?>" onclick="location.href='?tab=logs'">
-                        <i class="fa-solid fa-clipboard-list" style="margin-right:5px;font-size:11px"></i>System Logs
+                    <button class="tab-btn <?= $tab==='logs'       ?'active':'' ?>" onclick="location.href='?tab=logs'">
+                        <i class="fa-solid fa-clipboard-list" style="font-size:11px"></i>System Logs
                     </button>
                 </div>
             </div>
@@ -473,10 +646,10 @@ $activeAlerts  = count(array_filter($patients, fn($p) => ($p['hr_status'] ?? '')
                 <div style="padding:20px;display:grid;grid-template-columns:repeat(4,1fr);gap:16px">
                     <?php
                     $ds = [
-                        ['label'=>'Usable',      'count'=>$deviceStats['usable'],      'color'=>'#10b981', 'icon'=>'fa-circle-check'],
-                        ['label'=>'In-Use',       'count'=>$deviceStats['in-use'],       'color'=>'#3b82f6', 'icon'=>'fa-circle-dot'],
-                        ['label'=>'Maintenance',  'count'=>$deviceStats['maintenance'],  'color'=>'#f59e0b', 'icon'=>'fa-wrench'],
-                        ['label'=>'Disposable',   'count'=>$deviceStats['disposable'],   'color'=>'#ef4444', 'icon'=>'fa-trash'],
+                        ['label'=>'Usable',     'count'=>$deviceStats['usable'],     'color'=>'#10b981','icon'=>'fa-circle-check'],
+                        ['label'=>'In-Use',      'count'=>$deviceStats['in-use'],      'color'=>'#3b82f6','icon'=>'fa-circle-dot'],
+                        ['label'=>'Maintenance', 'count'=>$deviceStats['maintenance'], 'color'=>'#f59e0b','icon'=>'fa-wrench'],
+                        ['label'=>'Disposable',  'count'=>$deviceStats['disposable'],  'color'=>'#ef4444','icon'=>'fa-trash'],
                     ];
                     foreach ($ds as $d): ?>
                     <div class="mini-info-card">
@@ -515,8 +688,8 @@ $activeAlerts  = count(array_filter($patients, fn($p) => ($p['hr_status'] ?? '')
                             <td class="td-muted"><?= htmlspecialchars($u['email']??'—') ?></td>
                             <td>
                                 <span class="badge" style="<?= ($u['status']??'active')==='active'
-                                    ?'background:rgba(16,185,129,.1);color:#10b981;border:1px solid rgba(16,185,129,.25)'
-                                    :'background:rgba(239,68,68,.1);color:#ef4444;border:1px solid rgba(239,68,68,.25)' ?>">
+                                    ?'background:rgba(16,185,129,.1);color:#10b981;border:1px solid rgba(16,185,129,.35)'
+                                    :'background:rgba(239,68,68,.1);color:#ef4444;border:1px solid rgba(239,68,68,.35)' ?>">
                                     <?= ucfirst($u['status']??'active') ?>
                                 </span>
                             </td>
@@ -579,7 +752,7 @@ $activeAlerts  = count(array_filter($patients, fn($p) => ($p['hr_status'] ?? '')
                             <td>
                                 <button class="btn btn-ghost btn-sm"
                                     onclick="openPatientReports(<?= $p['id'] ?>, '<?= htmlspecialchars($p['name'], ENT_QUOTES) ?>', <?= $p['age'] ?>, '<?= htmlspecialchars($p['medical_condition']??'—', ENT_QUOTES) ?>')"
-                                    style="color:#6366f1;border-color:rgba(99,102,241,.25)">
+                                    style="color:#6366f1;border-color:rgba(99,102,241,.35)">
                                     <i class="fa-solid fa-clipboard-list"></i> Reports
                                     <?php if ($rptCount > 0): ?>
                                     <span class="report-count-badge"><?= $rptCount ?></span>
@@ -682,7 +855,7 @@ $activeAlerts  = count(array_filter($patients, fn($p) => ($p['hr_status'] ?? '')
                                     <?php endif; ?>
                                 <?php endif; ?>
                                 <a href="?tab=devices&delete_device=<?= $d['id'] ?>" class="action-btn"
-                                   style="background:rgba(239,68,68,.1);color:#ef4444;border-color:rgba(239,68,68,.2)"
+                                   style="background:rgba(239,68,68,.1);color:#ef4444;border-color:rgba(239,68,68,.35)"
                                    onclick="return confirm('Delete this device?')">
                                     <i class="fa-solid fa-trash"></i>
                                 </a>
@@ -864,13 +1037,16 @@ $activeAlerts  = count(array_filter($patients, fn($p) => ($p['hr_status'] ?? '')
                     <div class="form-group"><label class="form-label">Email</label><input type="email" name="email" id="editEmail" class="form-input"></div>
                     <div class="form-group"><label class="form-label">Role *</label>
                         <select name="role" id="editRole" class="form-select">
-                            <option value="admin">Admin</option><option value="manager">Manager</option>
-                            <option value="rescuer">Rescuer</option><option value="responder">Responder</option>
+                            <option value="admin">Admin</option>
+                            <option value="manager">Manager</option>
+                            <option value="rescuer">Rescuer</option>
+                            <option value="responder">Responder</option>
                         </select>
                     </div>
                     <div class="form-group"><label class="form-label">Status</label>
                         <select name="status" id="editStatus" class="form-select">
-                            <option value="active">Active</option><option value="inactive">Inactive</option>
+                            <option value="active">Active</option>
+                            <option value="inactive">Inactive</option>
                         </select>
                     </div>
                     <div class="form-group" style="grid-column:1/-1"><label class="form-label">New Password (leave blank to keep)</label><input type="password" name="password" class="form-input"></div>
@@ -1025,7 +1201,7 @@ $activeAlerts  = count(array_filter($patients, fn($p) => ($p['hr_status'] ?? '')
         </div>
         <div class="modal-body" style="max-height:65vh;overflow-y:auto">
             <div class="patient-report-info">
-                <div style="width:40px;height:40px;border-radius:50%;background:rgba(239,108,82,.1);border:1px solid rgba(239,108,82,.25);display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0">👤</div>
+                <div style="width:40px;height:40px;border-radius:50%;background:rgba(239,108,82,.1);border:1.5px solid rgba(239,108,82,.35);display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0">👤</div>
                 <div>
                     <div class="pri-name" id="prPatientName">—</div>
                     <div class="pri-sub" id="prPatientMeta">—</div>
@@ -1043,120 +1219,137 @@ $activeAlerts  = count(array_filter($patients, fn($p) => ($p['hr_status'] ?? '')
 <div id="toastContainer" class="toast-container"></div>
 <script src="../assets/js/scripts.js"></script>
 <script>
-(function tick(){ const el=document.getElementById('liveClock');if(el)el.textContent=new Date().toLocaleTimeString();setTimeout(tick,1000);})();
+(function tick(){
+    const el = document.getElementById('liveClock');
+    if (el) el.textContent = new Date().toLocaleTimeString();
+    setTimeout(tick, 1000);
+})();
 
-function openModal(id){ const el=document.getElementById(id);if(!el)return;el.classList.add('open','active');el.style.display='flex'; }
-function closeModal(id){ const el=document.getElementById(id);if(!el)return;el.classList.remove('open','active');el.style.display=''; }
-document.querySelectorAll('.modal-overlay').forEach(m=>m.addEventListener('click',e=>{if(e.target===m)closeModal(m.id);}));
+function openModal(id)  { const el=document.getElementById(id); if(!el)return; el.classList.add('open','active'); el.style.display='flex'; }
+function closeModal(id) { const el=document.getElementById(id); if(!el)return; el.classList.remove('open','active'); el.style.display=''; }
+document.querySelectorAll('.modal-overlay').forEach(m => m.addEventListener('click', e => { if(e.target===m) closeModal(m.id); }));
 
-function toggleSidebar(){
-    const sb=document.getElementById('sidebar');
-    const ov=document.getElementById('sidebarOverlay');
-    if(!sb)return;
-    const open=sb.classList.toggle('open');
-    if(ov)ov.classList.toggle('open',open);
-    document.body.style.overflow=open?'hidden':'';
+function toggleSidebar() {
+    const sb = document.getElementById('sidebar');
+    const ov = document.getElementById('sidebarOverlay');
+    if (!sb) return;
+    const open = sb.classList.toggle('open');
+    if (ov) ov.classList.toggle('open', open);
+    document.body.style.overflow = open ? 'hidden' : '';
 }
 
-function openEditUser(u){
-    document.getElementById('editUserId').value=u.id;
-    document.getElementById('editFullName').value=u.full_name;
-    document.getElementById('editEmail').value=u.email||'';
-    document.getElementById('editRole').value=u.role;
-    document.getElementById('editStatus').value=u.status||'active';
+function openEditUser(u) {
+    document.getElementById('editUserId').value    = u.id;
+    document.getElementById('editFullName').value  = u.full_name;
+    document.getElementById('editEmail').value     = u.email || '';
+    document.getElementById('editRole').value      = u.role;
+    document.getElementById('editStatus').value    = u.status || 'active';
     openModal('editUserModal');
 }
-function openEditPatient(p){
-    document.getElementById('editPatientId').value=p.id;
-    document.getElementById('editPatientName').value=p.name;
-    document.getElementById('editPatientAge').value=p.age;
-    document.getElementById('editPatientCondition').value=p.medical_condition||'';
-    document.getElementById('editPatientRescuer').value=p.assigned_to||'';
+
+function openEditPatient(p) {
+    document.getElementById('editPatientId').value        = p.id;
+    document.getElementById('editPatientName').value      = p.name;
+    document.getElementById('editPatientAge').value       = p.age;
+    document.getElementById('editPatientCondition').value = p.medical_condition || '';
+    document.getElementById('editPatientRescuer').value   = p.assigned_to || '';
     openModal('editPatientModal');
 }
-function openAssignModal(deviceId,deviceLabel){
-    document.getElementById('assignDeviceId').value=deviceId;
-    document.getElementById('assignDeviceName').textContent=deviceLabel;
+
+function openAssignModal(deviceId, deviceLabel) {
+    document.getElementById('assignDeviceId').value    = deviceId;
+    document.getElementById('assignDeviceName').textContent = deviceLabel;
     openModal('assignDeviceModal');
 }
 
-function openPatientReports(patientId,patientName,patientAge,patientCondition){
-    document.getElementById('prPatientName').textContent=patientName;
-    document.getElementById('prPatientMeta').textContent='Age: '+patientAge+' · Condition: '+(patientCondition||'—');
-    const reports=ALL_REPORTS[patientId]||[];
-    document.getElementById('prModalSub').textContent=reports.length+' report'+(reports.length!==1?'s':'')+' on file';
-    const list=document.getElementById('prReportsList');
-    const sevClass={low:'sev-low',medium:'sev-medium',high:'sev-high',critical:'sev-critical'};
-    if(reports.length===0){
-        list.innerHTML='<div class="report-empty">📭 No incident reports found for this patient.</div>';
+function openPatientReports(patientId, patientName, patientAge, patientCondition) {
+    document.getElementById('prPatientName').textContent = patientName;
+    document.getElementById('prPatientMeta').textContent = 'Age: ' + patientAge + ' · Condition: ' + (patientCondition || '—');
+    const reports = ALL_REPORTS[patientId] || [];
+    document.getElementById('prModalSub').textContent = reports.length + ' report' + (reports.length !== 1 ? 's' : '') + ' on file';
+    const list = document.getElementById('prReportsList');
+    const sevClass = { low:'sev-low', medium:'sev-medium', high:'sev-high', critical:'sev-critical' };
+    if (reports.length === 0) {
+        list.innerHTML = '<div class="report-empty">📭 No incident reports found for this patient.</div>';
     } else {
-        list.innerHTML=reports.map(function(r){
-            const dt=new Date(r.created_at);
-            const dStr=dt.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
-            const tStr=dt.toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit'});
-            const sc=sevClass[r.severity]||'sev-medium';
+        list.innerHTML = reports.map(function(r) {
+            const dt   = new Date(r.created_at);
+            const dStr = dt.toLocaleDateString('en-US', {month:'short',day:'numeric',year:'numeric'});
+            const tStr = dt.toLocaleTimeString('en-US', {hour:'2-digit',minute:'2-digit'});
+            const sc   = sevClass[r.severity] || 'sev-medium';
             return '<div class="report-card">'
-                +'<div class="report-card-header">'
-                +'<div class="report-card-title">'+escHtml(r.incident_type)+'</div>'
-                +'<span class="sev-badge '+sc+'">'+capFirst(r.severity)+'</span>'
-                +'</div>'
-                +'<div class="report-card-meta">'
-                +'<span>👤 '+escHtml(r.rescuer_name)+'</span>'
-                +'<span>📅 '+dStr+' at '+tStr+'</span>'
-                +'</div>'
-                +(r.description?'<div class="report-card-desc">'+escHtml(r.description)+'</div>':'<div style="font-size:12px;color:#9CA3AF;font-style:italic">No additional description provided.</div>')
-                +'</div>';
+                + '<div class="report-card-header">'
+                + '<div class="report-card-title">' + escHtml(r.incident_type) + '</div>'
+                + '<span class="sev-badge ' + sc + '">' + capFirst(r.severity) + '</span>'
+                + '</div>'
+                + '<div class="report-card-meta">'
+                + '<span>👤 ' + escHtml(r.rescuer_name) + '</span>'
+                + '<span>📅 ' + dStr + ' at ' + tStr + '</span>'
+                + '</div>'
+                + (r.description
+                    ? '<div class="report-card-desc">' + escHtml(r.description) + '</div>'
+                    : '<div style="font-size:12px;color:#9CA3AF;font-style:italic">No additional description provided.</div>')
+                + '</div>';
         }).join('');
     }
     openModal('patientReportsModal');
 }
-function escHtml(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
-function capFirst(s){return s?s.charAt(0).toUpperCase()+s.slice(1):'';}
 
-Chart.defaults.color='#94a3b8';
-Chart.defaults.borderColor='rgba(30,36,80,.06)';
-Chart.defaults.font.family="'DM Sans', sans-serif";
+function escHtml(s) {
+    return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+function capFirst(s) { return s ? s.charAt(0).toUpperCase() + s.slice(1) : ''; }
+
+Chart.defaults.color       = '#94a3b8';
+Chart.defaults.borderColor = 'rgba(30,36,80,.06)';
+Chart.defaults.font.family = "'DM Sans', sans-serif";
 
 <?php if ($tab === 'analytics' && count($hourlyData) > 0): ?>
-new Chart(document.getElementById('hourlyChart'),{
-    type:'line',
-    data:{
-        labels:<?= json_encode(array_column($hourlyData,'hour_label')) ?>,
-        datasets:[{
-            label:'Avg Heart Rate',data:<?= json_encode(array_column($hourlyData,'avg_bpm')) ?>,
-            borderColor:'#EF6C52',backgroundColor:'rgba(239,108,82,0.08)',
-            borderWidth:2.5,tension:0.4,fill:true,pointRadius:4,
-            pointBackgroundColor:'#EF6C52',pointBorderColor:'#fff',pointBorderWidth:2,
+new Chart(document.getElementById('hourlyChart'), {
+    type: 'line',
+    data: {
+        labels: <?= json_encode(array_column($hourlyData,'hour_label')) ?>,
+        datasets: [{
+            label: 'Avg Heart Rate',
+            data: <?= json_encode(array_column($hourlyData,'avg_bpm')) ?>,
+            borderColor: '#EF6C52', backgroundColor: 'rgba(239,108,82,0.08)',
+            borderWidth: 2.5, tension: 0.4, fill: true,
+            pointRadius: 4, pointBackgroundColor: '#EF6C52', pointBorderColor: '#fff', pointBorderWidth: 2,
         },{
-            label:'Critical Count',data:<?= json_encode(array_column($hourlyData,'critical_count')) ?>,
-            borderColor:'#ef4444',backgroundColor:'rgba(239,68,68,0.07)',
-            borderWidth:2,tension:0.4,fill:true,yAxisID:'y2',pointRadius:3,
+            label: 'Critical Count',
+            data: <?= json_encode(array_column($hourlyData,'critical_count')) ?>,
+            borderColor: '#ef4444', backgroundColor: 'rgba(239,68,68,0.07)',
+            borderWidth: 2, tension: 0.4, fill: true, yAxisID: 'y2', pointRadius: 3,
         }]
     },
-    options:{
-        responsive:true,maintainAspectRatio:false,
-        plugins:{legend:{position:'top',labels:{usePointStyle:true,padding:16}}},
-        scales:{
-            x:{grid:{color:'rgba(30,36,80,.05)'}},
-            y:{grid:{color:'rgba(30,36,80,.05)'},title:{display:true,text:'BPM',color:'#9CA3AF'}},
-            y2:{position:'right',grid:{display:false},title:{display:true,text:'Critical',color:'#9CA3AF'}}
+    options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { position: 'top', labels: { usePointStyle: true, padding: 16 } } },
+        scales: {
+            x:  { grid: { color: 'rgba(30,36,80,.05)' } },
+            y:  { grid: { color: 'rgba(30,36,80,.05)' }, title: { display: true, text: 'BPM',      color: '#9CA3AF' } },
+            y2: { position: 'right', grid: { display: false },   title: { display: true, text: 'Critical', color: '#9CA3AF' } }
         }
     }
 });
 <?php endif; ?>
 
 <?php if ($tab === 'analytics' && ($normalCnt + $warnCnt + $critCnt) > 0): ?>
-new Chart(document.getElementById('alertPieChart'),{
-    type:'doughnut',
-    data:{
-        labels:['Normal','Warning','Critical'],
-        datasets:[{
-            data:[<?= (int)$normalCnt ?>,<?= (int)$warnCnt ?>,<?= (int)$critCnt ?>],
-            backgroundColor:['#EF6C52','#f59e0b','#ef4444'],
-            borderWidth:0,hoverOffset:8
+new Chart(document.getElementById('alertPieChart'), {
+    type: 'doughnut',
+    data: {
+        labels: ['Normal','Warning','Critical'],
+        datasets: [{
+            data: [<?= (int)$normalCnt ?>, <?= (int)$warnCnt ?>, <?= (int)$critCnt ?>],
+            backgroundColor: ['#EF6C52','#f59e0b','#ef4444'],
+            borderWidth: 0, hoverOffset: 8
         }]
     },
-    options:{responsive:false,plugins:{legend:{position:'bottom',labels:{usePointStyle:true,padding:14}}},cutout:'65%'}
+    options: {
+        responsive: false,
+        plugins: { legend: { position: 'bottom', labels: { usePointStyle: true, padding: 14 } } },
+        cutout: '65%'
+    }
 });
 <?php endif; ?>
 </script>

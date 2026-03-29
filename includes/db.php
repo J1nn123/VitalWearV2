@@ -8,6 +8,10 @@ define('DB_HOST', 'localhost');
 define('DB_USER', 'root');
 define('DB_PASS', '');
 define('DB_NAME', 'heart_rate_system');
+// In db.php
+
+// define('BASE_URL', '/VitalWearV2'); // local
+define('BASE_URL', $_SERVER['HTTP_HOST'] === 'localhost' ? '/VitalWearV2' : '');
 
 function getDB() {
     static $pdo = null;
