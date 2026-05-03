@@ -62,7 +62,7 @@ body {
     -webkit-font-smoothing: antialiased;
 }
 
-/* ── Layout — flex, no old margin tricks ── */
+
 .layout {
     display: flex !important;
     min-height: 100vh;
