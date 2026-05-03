@@ -1,0 +1,76 @@
+-- =====================================================
+-- HeartCare - Heart Rate Monitoring System
+-- Database Setup Script
+-- Run this in phpMyAdmin or MySQL CLI
+-- =====================================================
+
+CREATE DATABASE IF NOT EXISTS heart_rate_system CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+USE heart_rate_system;
+
+-- Users
+CREATE TABLE IF NOT EXISTS users (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    username VARCHAR(50) UNIQUE NOT NULL,
+    password VARCHAR(255) NOT NULL,
+    full_name VARCHAR(100) NOT NULL,
+    role ENUM('admin','manager','rescuer','responder') NOT NULL,
+    email VARCHAR(100),
+    status ENUM('active','inactive') DEFAULT 'active',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- Patients
+CREATE TABLE IF NOT EXISTS patients (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(100) NOT NULL,
+    age INT NOT NULL,
+    `condition` VARCHAR(100),
+    assigned_rescuer_id INT,
+    room VARCHAR(20),
+    status ENUM('stable','warning','critical') DEFAULT 'stable',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (assigned_rescuer_id) REFERENCES users(id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- Heart rate logs
+CREATE TABLE IF NOT EXISTS heart_rate_logs (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    patient_id INT NOT NULL,
+    bpm INT NOT NULL,
+    status ENUM('normal','warning','critical') NOT NULL,
+    recorded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (patient_id) REFERENCES patients(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- System logs
+CREATE TABLE IF NOT EXISTS system_logs (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    user_id INT,
+    action VARCHAR(255) NOT NULL,
+    details TEXT,
+    ip_address VARCHAR(45),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- Incident reports
+CREATE TABLE IF NOT EXISTS incident_reports (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    rescuer_id INT NOT NULL,
+    patient_id INT NOT NULL,
+    title VARCHAR(200) NOT NULL,
+    description TEXT,
+    severity ENUM('low','medium','high','critical') DEFAULT 'medium',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (rescuer_id) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY (patient_id) REFERENCES patients(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- =====================================================
+-- Default Users (passwords hashed with PHP password_hash)
+-- Passwords: admin123, manager123, rescuer123, responder123
+-- =====================================================
+-- NOTE: Run index.php once to auto-seed via PHP (initDatabase())
+-- OR insert manually with the PHP hash values.
+-- The application will auto-initialize on first visit.
