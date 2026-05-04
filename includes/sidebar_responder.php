@@ -5,15 +5,8 @@ $user = getCurrentUser();
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;0,9..40,800;1,9..40,400&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="<?= BASE_URL ?>/assets/responder_sidebar.css">
 
-<!-- Responder sidebar & dashboard styles (extracted from inline) -->
-<link rel="stylesheet" href="../assets/responder_sidebar.css">
-
-<!-- ═══════════════════════════════════════════════════════
-     WEARABLE SIMULATOR STYLES — intentionally dark (sidebar widget)
-     These are kept here because they are tightly coupled to the
-     simulator modal JavaScript below.
-═══════════════════════════════════════════════════════ -->
 <style>
 .sim-modal-overlay {
     display: none; position: fixed; inset: 0;
@@ -56,7 +49,6 @@ $user = getCurrentUser();
 .btn-sim-lg-stop { background:linear-gradient(135deg,#ef4444,#dc2626);color:#fff;box-shadow:0 4px 16px rgba(239,68,68,.3); }
 .btn-sim-lg-stop:hover { transform:translateY(-1px); }
 .btn-sim-lg:disabled { opacity:.45;cursor:not-allowed;transform:none !important; }
-/* BPM display */
 .sim-bpm-display { display:none;flex-direction:column;align-items:center;gap:0;padding:4px 0 0; }
 .sim-bpm-display.visible { display:flex; }
 .sim-bpm-ring-wrap { position:relative;width:168px;height:168px;margin:0 auto; }
@@ -104,7 +96,6 @@ $user = getCurrentUser();
 }
 </style>
 
-<!-- ── DESKTOP SIDEBAR ── -->
 <aside class="sidebar" id="sidebar">
     <div class="sidebar-header">
         <a href="responder_dashboard.php" class="sidebar-logo">
@@ -173,7 +164,6 @@ $user = getCurrentUser();
     </div>
 </aside>
 
-<!-- ── MOBILE BOTTOM NAVBAR ── -->
 <nav class="mobile-bottom-nav" id="mobileBottomNav">
     <div class="mobile-bottom-nav-inner">
         <a href="responder_dashboard.php"
@@ -200,7 +190,6 @@ $user = getCurrentUser();
     </div>
 </nav>
 
-<!-- ── RESCUER ALERT PANEL ── -->
 <div class="rescuer-alert-panel" id="rescuerAlertPanel">
     <div class="rescuer-alert-panel-header">
         <div class="rescuer-alert-panel-title">
@@ -216,7 +205,6 @@ $user = getCurrentUser();
     </div>
 </div>
 
-<!-- ── SIMULATOR MODAL ── -->
 <div class="sim-modal-overlay" id="simModalOverlay" onclick="handleSimModalBackdrop(event)">
     <div class="sim-modal">
         <div class="sim-modal-handle"></div>
@@ -438,18 +426,7 @@ function toggleSidebar(){
     const ov=document.getElementById('sidebarOverlay');
     if(!sb)return;
     const open=sb.classList.toggle('open');
-    if(ov){
-        ov.style.display=open?'block':'none';
-        ov.style.backdropFilter='none';
-        ov.style.webkitBackdropFilter='none';
-        ov.style.filter='none';
-    }
-    const mc=document.querySelector('.main-content');
-    if(mc){
-        mc.style.filter='none';
-        mc.style.backdropFilter='none';
-        mc.style.webkitBackdropFilter='none';
-    }
+    if(ov){ov.classList.toggle('open',open);}
     document.body.style.overflow=open?'hidden':'';
 }
 </script>
