@@ -5,14 +5,13 @@ $user = getCurrentUser();
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;0,9..40,800;1,9..40,400&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="<?= BASE_URL ?>/assets/rescuer_sidebar.css">
+<link rel="stylesheet" href="<?= BASE_URL ?>/assets/rescuer_sidebar.css">
 
-<!-- ── DESKTOP SIDEBAR ── -->
 <aside class="sidebar" id="sidebar">
     <div class="sidebar-header">
         <a href="rescuer_dashboard.php" class="sidebar-logo">
             <div class="logo-icon">
-               <img src="<?= BASE_URL ?>/assets/image.png" alt="VitalWear Logo" width="36" height="36">      
+               <img src="<?= BASE_URL ?>/assets/image.png" alt="VitalWear Logo" width="36" height="36">
             </div>
             <span class="logo-text">VitalWear</span>
         </a>
@@ -71,7 +70,6 @@ $user = getCurrentUser();
     </nav>
 </aside>
 
-<!-- ── MOBILE BOTTOM NAVBAR ── -->
 <nav class="mobile-bottom-nav" id="mobileBottomNav">
     <div class="mobile-bottom-nav-inner">
         <a href="rescuer_dashboard.php"
@@ -98,6 +96,15 @@ $user = getCurrentUser();
 </nav>
 
 <script>
+function toggleSidebar() {
+    const sb = document.getElementById('sidebar');
+    const ov = document.getElementById('sidebarOverlay');
+    if (!sb) return;
+    const open = sb.classList.toggle('open');
+    if (ov) ov.classList.toggle('open', open);
+    document.body.style.overflow = open ? 'hidden' : '';
+}
+
 function updateRescuerAlertBadge(count) {
     ['sidebarAlertBadge', 'mobAlertBadge'].forEach(id => {
         const el = document.getElementById(id);
