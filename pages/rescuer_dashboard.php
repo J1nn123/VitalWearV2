@@ -65,6 +65,7 @@ $unreadAlerts = (int)$unreadStmt->fetchColumn();
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <title>Rescuer Dashboard — VitalWear</title>
     <link rel="stylesheet" href="../assets/css/styles.css">
+    <link rel="stylesheet" href="../assets/responder_dashboard.css">  
     <style>
     /* ── Report tab form fields ── */
     .rfield-label {

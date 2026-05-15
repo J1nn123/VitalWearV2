@@ -45,9 +45,7 @@ function getDB() {
 }
 
 
-/* =========================
-   INIT DATABASE
-   ========================= */
+
 
 function initDatabase() {
     $pdo = getDB();

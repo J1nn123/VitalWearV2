@@ -46,62 +46,12 @@ $chartColors  = json_encode(array_map(function($p) {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <title>Live Monitor — VitalWear</title>
-    <link rel="stylesheet" href="../assets/css/styles.css">
+    <link rel="stylesheet" href="../assets/styles.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
-    <style>
-
-    .main-content,
-    .page-content,
-    .layout > .main-content {
-        filter: none !important;
-        -webkit-filter: none !important;
-        backdrop-filter: none !important;
-        -webkit-backdrop-filter: none !important;
-    }
-
-    /* Sidebar overlay — dark curtain only, NO blur */
-    .sidebar-overlay {
-        display: none !important;
-        position: fixed !important; inset: 0 !important;
-        background: rgba(0,0,0,.50) !important;
-        backdrop-filter: none !important;
-        -webkit-backdrop-filter: none !important;
-        filter: none !important;
-        z-index: 9997 !important;
-        cursor: pointer;
-    }
-    .sidebar-overlay.open { display: block !important; }
-
-    /* Sidebar itself — never blurs */
-    .sidebar {
-        backdrop-filter: none !important;
-        -webkit-backdrop-filter: none !important;
-        filter: none !important;
-    }
-
-    /* Mobile bottom nav — always on top and always clickable */
-    .mobile-bottom-nav {
-        z-index: 10000 !important;
-        pointer-events: auto !important;
-        position: fixed !important;
-    }
-    .mobile-bottom-nav * { pointer-events: auto !important; }
-
-    /* ── Page-specific ── */
-    .quick-msg-row { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
-    .quick-msg-row .btn { font-size: 11px; padding: 5px 10px; }
-    @media (max-width: 768px) {
-        .quick-msg-row .btn { flex: 1 1 auto; text-align: center; justify-content: center; }
-    }
-    .form-error-box {
-        background: rgba(239,68,68,.08);
-        border: 1.5px solid rgba(239,68,68,.25);
-        color: #ef4444; border-radius: 8px;
-        padding: 10px 14px; font-size: 13px; margin-top: 10px;
-    }
-    </style>
+  <link rel="stylesheet" href="../assets/responder_dashboard.css">  <!-- ADD THIS -->
 </head>
+<link rel="stylesheet" href="../assets/responder_dashboard.css">  <!-- ADD THIS -->
 <body>
 
 <div id="sidebarOverlay" class="sidebar-overlay" onclick="toggleSidebar()"></div>
